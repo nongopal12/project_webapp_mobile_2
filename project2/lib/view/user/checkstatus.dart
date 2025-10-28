@@ -12,20 +12,23 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
   // colors
   static const Color brown = Color(0xFF6B2E1E);
   static const Color pageBg = Color(0xFFF5F5F5);
-  static const Color cardBg = Color(0xFFF2F2F2);
+  static const Color cardBg = Color(0xFFEAE7E6);
   static const Color pendingColor = Color(0xFFE6D60A); // yellow
   static const Color approvedColor = Color(0xFF4CAF50); // green
   static const Color rejectedColor = Color(0xFFF44336); // red
 
-  // current booking
+  // booking example
   final Map<String, String> booking = {
     'name': 'Ronaldo',
-    'room': '100',
-    'time': '20 Oct 2025 10:00 - 12:00',
-    'status': 'Pending',
+    'email': 'Ronaldo123@gmail.com',
+    'room': 'Room 101',
+    'time': '8:00pm - 10:00pm',
+    'reason': 'Work with friend',
+    'approvedBy': 'Ajarn ABC',
+    'status': 'Approved',
   };
 
-  //color based on status
+  // color based on status
   Color getStatusColor(String status) {
     switch (status) {
       case 'Approved':
@@ -42,88 +45,88 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
     return Scaffold(
       backgroundColor: pageBg,
       body: SafeArea(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Check Booking Status',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Check Booking Status',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
 
-                // booking card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Stack(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _IconTextRow(
-                            icon: Icons.person,
-                            text: booking['name']!,
+              // booking card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _infoRow(Icons.person, 'Name: ${booking['name']}'),
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.email, 'Email: ${booking['email']}'),
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.location_on, 'Room: ${booking['room']}'),
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.access_time, 'Time: ${booking['time']}'),
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.notes, 'Reason: ${booking['reason']}'),
+                    const SizedBox(height: 8),
+
+                    // approved by row
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.brown,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Approved by: ${booking['approvedBy']}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black87,
                           ),
-                          const SizedBox(height: 6),
-                          _IconTextRow(
-                            icon: Icons.location_on,
-                            text: booking['room']!,
-                          ),
-                          const SizedBox(height: 6),
-                          _IconTextRow(
-                            icon: Icons.access_time,
-                            text: booking['time']!,
-                          ),
-                          const SizedBox(height: 6),
-                          _IconTextRow(
-                            icon: Icons.description,
-                            text: 'Work with friend',
-                          ),
-                          const SizedBox(height: 6),
-                          _IconTextRow(icon: Icons.person_outline, text: '_'),
-                          const SizedBox(height: 36),
-                        ],
-                      ),
-                      // status badge
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: getStatusColor(booking['status']!),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            booking['status']!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: getStatusColor(booking['status']!),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          booking['status']!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
 
-      // bottom nav
+      // bottom navigation bar
       bottomNavigationBar: Container(
         color: brown,
         padding: const EdgeInsets.only(top: 6, bottom: 6),
@@ -155,28 +158,25 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
       ),
     );
   }
-}
 
-//  icon + text row
-class _IconTextRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _IconTextRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    const Color brown = Color(0xFF6B2E1E);
+  Widget _infoRow(IconData icon, String text) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: brown, size: 20),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
+        Icon(icon, color: Colors.brown, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 15, color: Colors.black87),
+          ),
+        ),
       ],
     );
   }
 }
 
-// bottom nav item
+// bottom navigation item widget
 class _BottomNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
