@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:project_mobile_app2/views/login.dart';
-import 'package:project_mobile_app2/views/staff/add_room.dart';
-import 'package:project_mobile_app2/views/staff/dashboard.dart';
-import 'package:project_mobile_app2/views/staff/edit_room.dart';
-import 'package:project_mobile_app2/views/staff/history_staff.dart';
-import 'package:project_mobile_app2/views/staff/profile_staff.dart';
+import 'package:project2/view/login.dart';
+import 'package:project2/view/staff/add_room.dart';
+import 'package:project2/view/staff/dashboard.dart';
+import 'package:project2/view/staff/edit_room.dart';
+import 'package:project2/view/staff/history_staff.dart';
+import 'package:project2/view/staff/profile_staff.dart';
 
 class Browser extends StatefulWidget {
   const Browser({super.key});

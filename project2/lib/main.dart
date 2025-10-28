@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:project_mobile_app2/views/login.dart'; // ✅ หน้า Login
-// import 'package:project_mobile_app2/views/staff/dashboard.dart'; // ใช้เมื่อทดสอบ
+import 'package:project2/view/login.dart';
 
 void main() {
   runApp(const MyApp());

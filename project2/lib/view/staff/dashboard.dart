@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:project_mobile_app2/views/login.dart';
-import 'package:project_mobile_app2/views/staff/browser.dart';
-import 'package:project_mobile_app2/views/staff/history_staff.dart';
-import 'package:project_mobile_app2/views/staff/profile_staff.dart';
+import 'package:project2/view/login.dart';
+import 'package:project2/view/staff/browser.dart';
+import 'package:project2/view/staff/history_staff.dart';
+import 'package:project2/view/staff/profile_staff.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});

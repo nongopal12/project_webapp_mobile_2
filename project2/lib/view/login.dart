@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'register.dart';
 
 // ✅ import หน้าของแต่ละ Role
-import 'package:project_mobile_app2/views/staff/dashboard.dart';
-import 'package:project_mobile_app2/views/user/booking_room.dart';
-import 'package:project_mobile_app2/views/approver/home.dart';
+import 'package:project2/view/staff/dashboard.dart';
+import 'package:project2/view/user/booking_room.dart';
+import 'package:project2/view/approver/home.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
