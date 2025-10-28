@@ -116,9 +116,7 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _idCtl,
-                          decoration: const InputDecoration(
-                            hintText: 'Email',
-                          ),
+                          decoration: const InputDecoration(hintText: 'Email'),
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Please enter email'
                               : null,
