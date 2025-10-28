@@ -48,10 +48,10 @@ class _LoginPageState extends State<LoginPage> {
           nextPage = const Dashboard();
           break;
         case 'approver':
-          nextPage = const UserHomePage();
+          nextPage = const ApproverHomePage();
           break;
         case 'user':
-          nextPage = const ApproverHomePage();
+          nextPage = const UserHomePage();
           break;
         default:
           ScaffoldMessenger.of(
