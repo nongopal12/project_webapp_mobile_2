@@ -1,7 +1,5 @@
-
 import 'package:flutter/material.dart';
-import 'package:project_mobile_app2/views/login.dart'; // ✅ import หน้า Login
-import 'package:project_mobile_app2/views/staff/dashboard.dart'; // เผื่อใช้ตอนทดสอบ
+import 'package:project2/view/login.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,10 +11,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color mainAppColor = Color(0xFF883C31); // สีน้ำตาลแดง
-    const Color accentColor = Color(0xFFFFCC00); // สีเหลือง
+    const Color accentColor  = Color(0xFFFFCC00); // สีเหลือง
 
     return MaterialApp(
       title: 'QuickRoom Staff',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: mainAppColor,
         scaffoldBackgroundColor: Colors.white,
@@ -36,10 +35,8 @@ class MyApp extends StatelessWidget {
           secondary: accentColor,
         ),
       ),
-      debugShowCheckedModeBanner: false,
       home: const LoginPage(), // ✅ หน้าแรกคือ LoginPage
+      // home: const Dashboard(), // ถ้าจะทดสอบหน้า Dashboard ให้สลับมาใช้บรรทัดนี้
     );
   }
 }
-
-
