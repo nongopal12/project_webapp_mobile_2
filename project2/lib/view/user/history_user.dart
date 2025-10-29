@@ -1,8 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:project2/view/login.dart';
 import 'checkstatus.dart';
+import 'booking_room.dart';
 
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
+
+  void _logout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF883C31),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Logged out successfully.')),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Approved':
+        return const Color(0xFF4CAF50);
+      case 'Rejected':
+        return const Color(0xFFF44336);
+      default:
+        return const Color(0xFFE6D60A);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,25 +98,19 @@ class HistoryPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              //  bookings
               ...bookingHistory.map((item) {
-                Color statusColor;
+                final statusColor = _statusColor(item['status']!);
                 IconData statusIcon;
                 String statusLabel;
 
                 if (item['status'] == 'Approved') {
-                  statusColor = const Color(0xFF4CAF50); // green
                   statusIcon = Icons.check_circle_outline;
                   statusLabel = 'Approved by: ${item['approvedBy']}';
                 } else if (item['status'] == 'Rejected') {
-                  statusColor = const Color(0xFFF44336); // red
                   statusIcon = Icons.cancel_outlined;
                   statusLabel = 'Rejected by: ${item['approvedBy']}';
                 } else {
-                  statusColor = const Color(0xFFE6D60A); // yellow
-
                   statusIcon = Icons.remove_circle_outline;
-
                   statusLabel = 'Approved by: _';
                 }
 
@@ -93,7 +135,6 @@ class HistoryPage extends StatelessWidget {
                       _infoRow(Icons.notes, 'Reason: ${item['reason']}'),
                       const SizedBox(height: 8),
 
-                      // Approved or Rejected by row
                       Row(
                         children: [
                           Icon(
@@ -101,8 +142,8 @@ class HistoryPage extends StatelessWidget {
                             color: item['status'] == 'Approved'
                                 ? Colors.green
                                 : item['status'] == 'Rejected'
-                                ? Colors.red
-                                : Colors.brown,
+                                    ? Colors.red
+                                    : Colors.brown,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -118,14 +159,10 @@ class HistoryPage extends StatelessWidget {
 
                       const SizedBox(height: 14),
 
-                      // Status Button
                       Align(
                         alignment: Alignment.centerRight,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
                             color: statusColor,
                             borderRadius: BorderRadius.circular(6),
@@ -142,13 +179,12 @@ class HistoryPage extends StatelessWidget {
                     ],
                   ),
                 );
-              }),
+              }).toList(),
             ],
           ),
         ),
       ),
 
-      // bottom nav
       bottomNavigationBar: Container(
         color: const Color(0xFF6B2E1E),
         padding: const EdgeInsets.only(top: 6, bottom: 6),
@@ -157,7 +193,17 @@ class HistoryPage extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _BottomNavItem(icon: Icons.home, label: 'HOME', onTap: () {}),
+              _BottomNavItem(
+                icon: Icons.home,
+                label: 'HOME',
+                onTap: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const UserHomePage()),
+                    (route) => false,
+                  );
+                },
+              ),
               _BottomNavItem(
                 icon: Icons.history,
                 label: 'History',
@@ -173,7 +219,11 @@ class HistoryPage extends StatelessWidget {
                   );
                 },
               ),
-              _BottomNavItem(icon: Icons.logout, label: 'Logout', onTap: () {}),
+              _BottomNavItem(
+                icon: Icons.logout,
+                label: 'Logout',
+                onTap: () => _logout(context),
+              ),
             ],
           ),
         ),
@@ -234,4 +284,3 @@ class _BottomNavItem extends StatelessWidget {
     );
   }
 }
-

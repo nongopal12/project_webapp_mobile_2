@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'history_user.dart';
+import 'booking_room.dart';
+import 'package:project2/view/login.dart';
 
 class CheckStatusPage extends StatefulWidget {
   const CheckStatusPage({super.key});
@@ -38,6 +40,41 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
       default:
         return pendingColor;
     }
+  }
+
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF883C31),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Logged out successfully.')),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -101,10 +138,7 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         decoration: BoxDecoration(
                           color: getStatusColor(booking['status']!),
                           borderRadius: BorderRadius.circular(6),
@@ -135,7 +169,17 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _BottomNavItem(icon: Icons.home, label: 'HOME', onTap: () {}),
+              _BottomNavItem(
+                icon: Icons.home,
+                label: 'HOME',
+                onTap: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const UserHomePage()),
+                    (route) => false,
+                  );
+                },
+              ),
               _BottomNavItem(
                 icon: Icons.history,
                 label: 'History',
@@ -151,7 +195,11 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
                 label: 'Check Status',
                 onTap: () {},
               ),
-              _BottomNavItem(icon: Icons.logout, label: 'Logout', onTap: () {}),
+              _BottomNavItem(
+                icon: Icons.logout,
+                label: 'Logout',
+                onTap: _logout,
+              ),
             ],
           ),
         ),
@@ -212,4 +260,3 @@ class _BottomNavItem extends StatelessWidget {
     );
   }
 }
-

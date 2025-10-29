@@ -32,10 +32,44 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
     });
   }
 
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF883C31),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Logged out successfully.')),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showConfirmDialog(BuildContext context) {
-    String reasonText = selectedReason == "Other"
-        ? otherReasonController.text.trim()
-        : selectedReason ?? "";
+    String reasonText =
+        selectedReason == "Other" ? otherReasonController.text.trim() : selectedReason ?? "";
 
     showDialog(
       context: context,
@@ -57,8 +91,7 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
                 Navigator.pop(context);
@@ -118,14 +151,12 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                   children: [
                     Text(
                       "${widget.roomName} (${widget.timeSlot})",
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 10),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(widget.image,
-                          height: 150, fit: BoxFit.cover),
+                      child: Image.asset(widget.image, height: 150, fit: BoxFit.cover),
                     ),
                     const SizedBox(height: 16),
                     const Align(
@@ -138,21 +169,14 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                       ),
                       value: selectedReason,
                       items: const [
-                        DropdownMenuItem(
-                            value: "Study", child: Text("Study")),
-                        DropdownMenuItem(
-                            value: "Group Meeting",
-                            child: Text("Group Meeting")),
-                        DropdownMenuItem(
-                            value: "Project Work",
-                            child: Text("Project Work")),
+                        DropdownMenuItem(value: "Study", child: Text("Study")),
+                        DropdownMenuItem(value: "Group Meeting", child: Text("Group Meeting")),
+                        DropdownMenuItem(value: "Project Work", child: Text("Project Work")),
                         DropdownMenuItem(value: "Other", child: Text("Other")),
                       ],
                       onChanged: (value) {
@@ -172,8 +196,7 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                         maxLines: 2,
                         decoration: InputDecoration(
                           labelText: "Please specify your reason",
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
 
@@ -181,20 +204,16 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 30, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: selectedReason == null ||
-                              (isOtherSelected &&
-                                  otherReasonController.text.trim().isEmpty)
+                              (isOtherSelected && otherReasonController.text.trim().isEmpty)
                           ? null
                           : () {
                               _showConfirmDialog(context);
                             },
-                      child: const Text("Confirm Booking",
-                          style: TextStyle(color: Colors.white)),
+                      child: const Text("Confirm Booking", style: TextStyle(color: Colors.white)),
                     ),
                   ],
                 ),
@@ -250,13 +269,7 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
             _BottomNavItem(
               icon: Icons.logout,
               label: 'Logout',
-              onTap: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                  (route) => false,
-                );
-              },
+              onTap: _logout,
             ),
           ],
         ),
