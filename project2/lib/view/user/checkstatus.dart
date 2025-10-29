@@ -212,4 +212,3 @@ class _BottomNavItem extends StatelessWidget {
     );
   }
 }
-

@@ -3,6 +3,7 @@ import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/dashboard.dart';
 import 'package:project2/view/staff/history_staff.dart';
+import 'package:project2/view/staff/profile_staff.dart';
 
 class ProfileStaff extends StatefulWidget {
   const ProfileStaff({super.key});
@@ -13,7 +14,7 @@ class ProfileStaff extends StatefulWidget {
 
 class _ProfileStaffState extends State<ProfileStaff> {
   // ================================================================
-  // Section 1: ฟังก์ชัน Logout
+  // ฟังก์ชัน Logout
   // ================================================================
   void _logout() {
     showDialog(
@@ -51,7 +52,7 @@ class _ProfileStaffState extends State<ProfileStaff> {
   }
 
   // ================================================================
-  // Section 2: การเปลี่ยนหน้า (Bottom Navigation)
+  // การเปลี่ยนหน้า (Bottom Navigation)
   // ================================================================
   void _onItemTapped(int index) {
     switch (index) {
@@ -79,7 +80,7 @@ class _ProfileStaffState extends State<ProfileStaff> {
   }
 
   // ================================================================
-  // Section 3: หน้าหลักของโปรไฟล์ Staff
+  // Build หน้าโปรไฟล์ใหม่ (ใช้รูปภาพแทน UI การ์ด)
   // ================================================================
   @override
   Widget build(BuildContext context) {
@@ -88,7 +89,7 @@ class _ProfileStaffState extends State<ProfileStaff> {
 
     return Scaffold(
       // ------------------------------------------------------------
-      // AppBar
+      // AppBar ด้านบน
       // ------------------------------------------------------------
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -124,76 +125,22 @@ class _ProfileStaffState extends State<ProfileStaff> {
       ),
 
       // ------------------------------------------------------------
-      // Body: โปรไฟล์ของ Staff
+      // BODY: แสดงภาพโปรไฟล์เต็มหน้า
       // ------------------------------------------------------------
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // รูปโปรไฟล์จำลอง
-              const CircleAvatar(
-                radius: 60,
-                backgroundColor: Color(0xFF883C31),
-                child: Icon(Icons.person, size: 80, color: Colors.white),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(
+            'assets/images/Profile_staff.jpg',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Text(
+                'Image not found: profile_staff.jpg',
+                style: TextStyle(color: Colors.red),
               ),
-              const SizedBox(height: 20),
-
-              // ชื่อ Staff
-              const Text(
-                'Ronaldo Staff',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              // ตำแหน่ง/อีเมล
-              const Text(
-                'Email: ronaldo.staff@mfu.ac.th',
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-
-              // ปุ่มแก้ไขโปรไฟล์ (จำลอง)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: mainAppColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: const Icon(Icons.edit),
-                label: const Text('Edit Profile'),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Edit Profile clicked (Mock Only)'),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // ปุ่ม Logout ใหญ่ตรงกลาง
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: mainAppColor, width: 2),
-                  foregroundColor: mainAppColor,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                icon: const Icon(Icons.logout),
-                label: const Text('Logout'),
-                onPressed: _logout,
-              ),
-            ],
+            ),
           ),
         ),
       ),
