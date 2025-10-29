@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:project2/view/user/booking_room2.dart';
+import 'history_user.dart';
+import 'checkstatus.dart';
+import '../login.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -9,7 +12,7 @@ class UserHomePage extends StatefulWidget {
 }
 
 class _BookingRoomPageState extends State<UserHomePage> {
-  // Mock data (ready to replace with API later)
+  // Mock data (ready for API connection later)
   final List<Map<String, dynamic>> roomList = [
     {
       "roomName": "Room 100 (For 4 people)",
@@ -58,7 +61,7 @@ class _BookingRoomPageState extends State<UserHomePage> {
       case "Available":
         return Colors.green;
       case "Pending":
-        return Colors.yellow[700]!;
+        return Colors.amber[700]!;
       case "Reserved":
         return Colors.orange;
       case "Not Available":
@@ -84,97 +87,108 @@ class _BookingRoomPageState extends State<UserHomePage> {
           'QuickRoom',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        centerTitle: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            Row(
-              children: [
-                const Text("Room list",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 10),
-                Text(formattedDate,
-                    style: const TextStyle(color: Colors.black54)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...roomList.map((room) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.asset(room['image'],
-                            height: 120,
-                            width: double.infinity,
-                            fit: BoxFit.cover),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(room['roomName'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Column(
-                        children: room['slots'].map<Widget>((slot) {
-                          final statusColor = getStatusColor(slot['status']);
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(slot['time'],
-                                  style: const TextStyle(fontSize: 14)),
-                              GestureDetector(
-                                onTap: slot['status'] == "Available"
-                                    ? () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                BookingRoomDetailPage(
-                                                    roomName: room['roomName'],
-                                                    timeSlot: slot['time'],
-                                                    image: room['image']),
-                                          ),
-                                        );
-                                      }
-                                    : null,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    slot['status'],
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ListView(
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    "Room list",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                ),
-              );
-            }),
-          ],
+                  const SizedBox(width: 10),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ...roomList.map((room) => _buildRoomCard(context, room)).toList(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
+    );
+  }
+
+  Widget _buildRoomCard(BuildContext context, Map<String, dynamic> room) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                room['image'],
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              room['roomName'],
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Column(
+              children: room['slots'].map<Widget>((slot) {
+                final statusColor = getStatusColor(slot['status']);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(slot['time'], style: const TextStyle(fontSize: 14)),
+                      GestureDetector(
+                        onTap: slot['status'] == "Available"
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BookingRoomDetailPage(
+                                      roomName: room['roomName'],
+                                      timeSlot: slot['time'],
+                                      image: room['image'],
+                                    ),
+                                  ),
+                                );
+                              }
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            slot['status'],
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -186,33 +200,96 @@ class _BookingRoomPageState extends State<UserHomePage> {
     return months[month - 1];
   }
 
-  // ต้องแก้ให้ปุ่มกดได้ กด log out แล้ว กลับไปหน้า log in
   Widget _buildBottomNavBar(BuildContext context) {
-    return BottomAppBar(
+    return Container(
       color: const Color(0xFF6B2E1E),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      child: SafeArea(
+        top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _bottomIcon(Icons.home, "HOME"),
-            _bottomIcon(Icons.history, "History"),
-            _bottomIcon(Icons.edit_note, "Check Status"),
-            _bottomIcon(Icons.logout, "Logout"),
+            _BottomNavItem(
+              icon: Icons.home,
+              label: 'HOME',
+              onTap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserHomePage()),
+                  (route) => false,
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.history,
+              label: 'History',
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryPage()),
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.edit_note,
+              label: 'Check Status',
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CheckStatusPage()),
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.logout,
+              label: 'Logout',
+              onTap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _bottomIcon(IconData icon, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: Colors.white),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ],
+class _BottomNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: Colors.white24,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
-

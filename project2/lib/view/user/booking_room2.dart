@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:project2/view/login.dart';
+import 'package:project2/view/user/booking_room.dart';
+import 'history_user.dart';
+import 'checkstatus.dart';
 
 class BookingRoomDetailPage extends StatefulWidget {
   final String roomName;
@@ -23,25 +27,31 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Listen to text field changes for enabling/disabling the button
     otherReasonController.addListener(() {
       setState(() {});
     });
   }
 
   void _showConfirmDialog(BuildContext context) {
+    String reasonText = selectedReason == "Other"
+        ? otherReasonController.text.trim()
+        : selectedReason ?? "";
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Confirm Booking"),
           content: Text(
-              "Are you sure you want to book ${widget.roomName} for ${widget.timeSlot}?"),
+            "Are you sure you want to book ${widget.roomName} for ${widget.timeSlot}?\n\nReason: $reasonText",
+          ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           actions: [
             TextButton(
-              child: const Text("Cancel",
-                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             ElevatedButton(
@@ -51,18 +61,21 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                     borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
-                Navigator.pop(context); // close dialog
+                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: Colors.green,
                     content: Text(
-                        "Booking confirmed for ${widget.roomName} (${widget.timeSlot})"),
+                      "Booking confirmed for ${widget.roomName} (${widget.timeSlot})",
+                    ),
                   ),
                 );
-                Navigator.pop(context); // back to previous page
+                Navigator.pop(context);
               },
-              child: const Text("Yes, Book It",
-                  style: TextStyle(color: Colors.white)),
+              child: const Text(
+                "Yes, Book It",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -84,16 +97,19 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF6B2E1E),
-        title: const Text("Booking Room",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Booking Room",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Center(
           child: Card(
             color: const Color(0xFFF5F5F5),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
@@ -114,8 +130,10 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                     const SizedBox(height: 16),
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text("Booking Reason:",
-                          style: TextStyle(fontSize: 14)),
+                      child: Text(
+                        "Booking Reason:",
+                        style: TextStyle(fontSize: 14),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
@@ -148,7 +166,6 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Only show text field when “Other” is selected
                     if (isOtherSelected)
                       TextField(
                         controller: otherReasonController,
@@ -190,32 +207,96 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
     );
   }
 
-  // ต้องแก้ให้ปุ่มกดได้ กด log out แล้ว กลับไปหน้า log in
   Widget _buildBottomNavBar(BuildContext context) {
-    return BottomAppBar(
+    return Container(
       color: const Color(0xFF6B2E1E),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      child: SafeArea(
+        top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _bottomIcon(Icons.home, "HOME"),
-            _bottomIcon(Icons.history, "History"),
-            _bottomIcon(Icons.edit_note, "Check Status"),
-            _bottomIcon(Icons.logout, "Logout"),
+            _BottomNavItem(
+              icon: Icons.home,
+              label: 'HOME',
+              onTap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserHomePage()),
+                  (route) => false,
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.history,
+              label: 'History',
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryPage()),
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.edit_note,
+              label: 'Check Status',
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CheckStatusPage()),
+                );
+              },
+            ),
+            _BottomNavItem(
+              icon: Icons.logout,
+              label: 'Logout',
+              onTap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _bottomIcon(IconData icon, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: Colors.white),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ],
+class _BottomNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: Colors.white24,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
