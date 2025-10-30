@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:project2/view/login.dart';
 import 'package:project2/view/user/booking_room2.dart';
 import 'history_user.dart';
 import 'checkstatus.dart';
-import '../login.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -12,7 +12,7 @@ class UserHomePage extends StatefulWidget {
 }
 
 class _BookingRoomPageState extends State<UserHomePage> {
-  // Mock data (ready for API connection later)
+  // Mock data (พร้อมสำหรับต่อ API ในอนาคต)
   final List<Map<String, dynamic>> roomList = [
     {
       "roomName": "Room 100 (For 4 people)",
@@ -71,6 +71,41 @@ class _BookingRoomPageState extends State<UserHomePage> {
       default:
         return Colors.black;
     }
+  }
+
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF883C31),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Logged out successfully.')),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -213,6 +248,7 @@ class _BookingRoomPageState extends State<UserHomePage> {
               icon: Icons.home,
               label: 'HOME',
               onTap: () {
+                // อยู่หน้า Home แล้ว: reset stack ให้ชัดเจน
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const UserHomePage()),
@@ -243,13 +279,7 @@ class _BookingRoomPageState extends State<UserHomePage> {
             _BottomNavItem(
               icon: Icons.logout,
               label: 'Logout',
-              onTap: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                  (route) => false,
-                );
-              },
+              onTap: _logout,
             ),
           ],
         ),
