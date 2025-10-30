@@ -12,6 +12,9 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+  // ---------------------------------------------------------------
+  // Bottom Navigation
+  // ---------------------------------------------------------------
   void _onItemTapped(int index) {
     switch (index) {
       case 0:
@@ -37,6 +40,9 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // Logout Confirmation
+  // ---------------------------------------------------------------
   void _logout() {
     showDialog(
       context: context,
@@ -72,6 +78,32 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // Popup Message
+  // ---------------------------------------------------------------
+  void _showMailPopup() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text(' Messages'),
+        content: const Text(
+          'You have 99+ new messages',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // Build UI
+  // ---------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final Color mainAppColor = Theme.of(context).primaryColor;
@@ -110,16 +142,77 @@ class _DashboardState extends State<Dashboard> {
           child: Container(color: Colors.grey[300], height: 1.0),
         ),
       ),
+
+      // ------------------------------------------------------------
+      // BODY
+      // ------------------------------------------------------------
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Dashboard',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            // 🔹 บรรทัด Dashboard + กล่องจดหมาย (อยู่นอกการ์ด)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                GestureDetector(
+                  onTap: _showMailPopup,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF883C31),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              offset: const Offset(1, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.mail,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Text(
+                            '99+',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 10),
+            _buildProfileCard(context),
+            const SizedBox(height: 20),
+
             GridView.count(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
@@ -160,6 +253,10 @@ class _DashboardState extends State<Dashboard> {
           ],
         ),
       ),
+
+      // ------------------------------------------------------------
+      // BOTTOM NAV
+      // ------------------------------------------------------------
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: mainAppColor,
@@ -177,6 +274,76 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  // ---------------------------------------------------------------
+  // Profile Card (เตี้ยและไม่ชน)
+  // ---------------------------------------------------------------
+  Widget _buildProfileCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 245, 243, 243),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.person, size: 32, color: Colors.grey),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'Mr. Chayut Samanupawin',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF883C31),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      'Status: ',
+                      style: TextStyle(fontSize: 11, color: Colors.black87),
+                    ),
+                    Text(
+                      'Normal',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'ID: 00002',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                Text('Position: Staff', style: TextStyle(fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // Dashboard Cards
+  // ---------------------------------------------------------------
   Widget _buildDashboardCard(
     BuildContext context,
     IconData icon,
