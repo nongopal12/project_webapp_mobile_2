@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project2/view/approver/approve.dart';
 import 'register.dart';
 
 // ✅ import หน้าของแต่ละ Role
@@ -48,7 +49,7 @@ class _LoginPageState extends State<LoginPage> {
           nextPage = const Dashboard();
           break;
         case 'approver':
-          nextPage = const ApproverHomePage();
+          nextPage = const HomeApprover();
           break;
         case 'user':
           nextPage = const UserHomePage();

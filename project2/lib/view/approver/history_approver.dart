@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'proflie.dart';
+import 'approve.dart';
+import 'home.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -153,7 +156,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   rejectReason: 'Room not available at this time.',
                 ),
                 OrderCard(
-                  orderNumber: 'ORDER0002',
+                  orderNumber: 'ORDER0003',
                   room: 'Room 12',
                   time: '12.00',
                   status: 'Rejected',
@@ -165,19 +168,42 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
 
-      // Bottom Navigation
+      // ✅ Bottom Navigation (เชื่อมเหมือนหน้าอื่น)
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF7A2E0C),
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white70,
         showUnselectedLabels: true,
+        currentIndex: 2,
+        onTap: (i) {
+          switch (i) {
+            case 0:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const HomeApprover()),
+              );
+              break;
+            case 1:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApprovePage()),
+              );
+              break;
+            case 2:
+              // หน้าปัจจุบัน
+              break;
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
+              );
+              break;
+          }
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle),
-            label: 'Approver',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: 'Approver'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
@@ -186,6 +212,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 }
 
+// ======= Card แสดงประวัติ =======
 class OrderCard extends StatelessWidget {
   final String orderNumber;
   final String room;
