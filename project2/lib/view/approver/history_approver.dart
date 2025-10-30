@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project2/view/login.dart';
 import 'proflie.dart';
 import 'approve.dart';
 import 'home.dart';
@@ -28,36 +29,44 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  // ✅ ฟังก์ชันยืนยันการออกจากระบบ
-  Future<void> _confirmLogout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+// ✅ ฟังก์ชันยืนยันการออกจากระบบ
+Future<void> _confirmLogout() async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Logout'),
+      content: const Text('Are you sure you want to log out?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Log Out'),
-          ),
-        ],
-      ),
+          child: const Text('Log Out'),
+        ),
+      ],
+    ),
+  );
+
+  if (ok == true) {
+    // ✅ แสดงข้อความ
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Log out successfully')),
     );
 
-    if (ok == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log out successfully')),
-      );
-    }
+    // ✅ กลับไปหน้า Login (แทนที่ stack ทั้งหมด)
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
+}
 
   // ฟังก์ชันแปลงวันที่เป็นข้อความ (ไม่ใช้ intl)
   String getFormattedDate(DateTime date) {
