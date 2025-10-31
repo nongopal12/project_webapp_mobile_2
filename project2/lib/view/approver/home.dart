@@ -239,7 +239,7 @@ class _HomeApproverState extends State<HomeApprover> {
                         radius: 22,
                         // ใช้ไฟล์ png ที่มีในโปรเจกต์
                         backgroundImage: AssetImage(
-                          'assets/avatar_placeholder.png',
+                          'assets/images/avatar_placeholder.png',
                         ),
                       ),
                       const SizedBox(width: 10),

@@ -4,7 +4,6 @@ import 'package:project2/view/approver/proflie.dart';
 import 'home.dart';
 import 'approve.dart';
 
-
 /// ===== Colors สำหรับหน้าแสดงสถานะห้อง =====
 class QColors {
   static const bg = Color(0xFFF7F7F9);
@@ -14,10 +13,10 @@ class QColors {
   static const text = Color(0xFF2E2E2E);
 
   // ✅ สีสถานะห้อง
-  static const free = Color(0xFF2ECC71);       // เขียว (ห้องว่าง)
-  static const pending = Color(0xFFF1C40F);    // เหลือง (รออนุมัติ)
-  static const reserved = Color(0xFF3498DB);   // น้ำเงิน (จองแล้ว)
-  static const disabled = Color(0xFFE74C3C);   // แดง (ปิดใช้งาน)
+  static const free = Color(0xFF2ECC71); // เขียว (ห้องว่าง)
+  static const pending = Color(0xFFF1C40F); // เหลือง (รออนุมัติ)
+  static const reserved = Color(0xFF3498DB); // น้ำเงิน (จองแล้ว)
+  static const disabled = Color(0xFFE74C3C); // แดง (ปิดใช้งาน)
 }
 
 /// หน้าแสดงสถานะห้อง (Free / Pending / Reserved / Disabled)
@@ -34,12 +33,12 @@ class _StatusRoomPageState extends State<StatusRoomPage> {
 
   /// mock room data
   List<Map<String, dynamic>> get _allRooms => [
-        {'room': 'ห้อง ที่ 1', 'status': 'Free', 'img': 'assets/room1.png'},
-        {'room': 'ห้อง ที่ 2', 'status': 'Pending', 'img': 'assets/room1.png'},
-        {'room': 'ห้อง ที่ 3', 'status': 'Reserved', 'img': 'assets/room1.png'},
-        {'room': 'ห้อง ที่ 4', 'status': 'Disabled', 'img': 'assets/room1.png'},
-        {'room': 'ห้อง ที่ 5', 'status': 'Free', 'img': 'assets/room1.png'},
-      ];
+    {'room': 'ห้อง ที่ 1', 'status': 'Free', 'img': 'assets/images/Meeting-RoomA.jpg'},
+    {'room': 'ห้อง ที่ 2', 'status': 'Pending', 'img': 'assets/images/Meeting-Room-B.jpg'},
+    {'room': 'ห้อง ที่ 3', 'status': 'Reserved', 'img': 'assets/images/Meeting-RoomC.jpg'},
+    {'room': 'ห้อง ที่ 4', 'status': 'Disabled', 'img': 'assets/images/MeetingRoomD.jpg'},
+    {'room': 'ห้อง ที่ 5', 'status': 'Free', 'img': 'assets/images/MeetingRoomE.jpg'},
+  ];
 
   Color _statusColor(String s) {
     switch (s) {
@@ -63,8 +62,10 @@ class _StatusRoomPageState extends State<StatusRoomPage> {
     return Scaffold(
       backgroundColor: QColors.bg,
       appBar: AppBar(
-        title: Text('สถานะห้อง : ${widget.status}',
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          'สถานะห้อง : ${widget.status}',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         backgroundColor: QColors.primaryRed,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -163,7 +164,11 @@ class _StatusRoomPageState extends State<StatusRoomPage> {
         color: QColors.primaryRed,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
-          BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -2)),
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 12,
+            offset: Offset(0, -2),
+          ),
         ],
       ),
       child: SafeArea(
@@ -190,17 +195,17 @@ class _StatusRoomPageState extends State<StatusRoomPage> {
                       );
                       break;
                     case 2:
-                                            Navigator.push(
+                      Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const HistoryPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const HistoryPage()),
                       );
                       break;
                     case 3:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileApproverPage(),
+                        ),
                       );
                       break;
                   }
@@ -221,7 +226,9 @@ class _StatusRoomPageState extends State<StatusRoomPage> {
                         style: TextStyle(
                           color: active ? QColors.gold : Colors.white,
                           fontSize: 12.5,
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           letterSpacing: 0.2,
                         ),
                       ),
