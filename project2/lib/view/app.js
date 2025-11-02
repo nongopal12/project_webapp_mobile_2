@@ -13,6 +13,46 @@ app.get("/", (req, res) => {
   res.send("Server is running and connected to MySQL ✅");
 });
 
+// login  system
+
+
+
+
+
+
+// register
+
+
+
+
+
+
+
+//user
+
+
+
+
+
+
+
+
+
+
+//staff
+
+
+
+
+
+
+//approver
+
+
+
+
+
+
 // ====== START SERVER ======
 const PORT = 3000;
 app.listen(PORT, () => {
