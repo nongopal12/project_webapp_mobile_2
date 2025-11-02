@@ -1,33 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-/// ====== สีที่ใช้ทั้งหน้า ======
 class AppColors {
   static const red = Color(0xFF7B3028);
   static const gold = Color.fromRGBO(255, 193, 7, 1);
 }
 
-/// ====== Mock API สำหรับสมัครสมาชิก ======
-/// ถ้ามีแบ็กเอนด์จริง ค่อยเปลี่ยนเนื้อในฟังก์ชัน register ให้ยิง HTTP
-class AuthApi {
-  Future<void> register({
-    required String emailOrPhone,
-    required String name,
-    required String password,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (emailOrPhone.isEmpty || name.isEmpty || password.length < 6) {
-      throw Exception('Invalid register data');
-    }
-    // ตัวอย่าง: สมมติว่าบัญชีนี้ถูกใช้ไปแล้ว
-    if (emailOrPhone == 'admin') {
-      throw Exception('This email/phone is already in use');
-    }
-    // สำเร็จ -> เงียบ ๆ (void)
-  }
-}
-
-/// ====== Register Page ======
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -38,7 +17,7 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _form = GlobalKey<FormState>();
   final _idCtl = TextEditingController();
-  final _nameCtl = TextEditingController();
+  final _usernameCtl = TextEditingController();
   final _pwdCtl = TextEditingController();
   final _pwd2Ctl = TextEditingController();
 
@@ -46,12 +25,10 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePwd = true;
   bool _obscurePwd2 = true;
 
-  final _api = AuthApi();
-
   @override
   void dispose() {
     _idCtl.dispose();
-    _nameCtl.dispose();
+    _usernameCtl.dispose();
     _pwdCtl.dispose();
     _pwd2Ctl.dispose();
     super.dispose();
@@ -60,26 +37,36 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     setState(() => _loading = true);
+
     try {
-      await _api.register(
-        emailOrPhone: _idCtl.text.trim(),
-        name: _nameCtl.text.trim(),
-        password: _pwdCtl.text,
+      final url = Uri.parse("http://192.168.1.112:3000/api/register");
+
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _idCtl.text.trim(),
+          'username': _usernameCtl.text.trim(),
+          'password': _pwdCtl.text.trim(),
+        }),
       );
-      if (mounted) {
+
+      if (res.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Register success! Please login.')),
         );
-        Navigator.pop(context); // ย้อนกลับไปหน้า Login
-      }
-    } on Exception catch (e) {
-      if (mounted) {
+        Navigator.pop(context);
+      } else {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Register failed: $e')));
+        ).showSnackBar(SnackBar(content: Text('Register failed: ${res.body}')));
       }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      setState(() => _loading = false);
     }
   }
 
@@ -87,136 +74,321 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Register'),
-        backgroundColor: AppColors.red,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _form,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Create account',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: AppColors.red,
-                      fontWeight: FontWeight.w700,
-                    ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Card(
+                  elevation: 8,
+                  shadowColor: AppColors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(height: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Form(
+                      key: _form,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Header Icon
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [AppColors.gold, AppColors.gold],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.gold,
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.person_add_rounded,
+                              size: 40,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
 
-                  // Email / Phone
-                  TextFormField(
-                    controller: _idCtl,
-                    decoration: const InputDecoration(
-                      hintText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Please enter email/phone'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
+                          // Title
+                          Text(
+                            'Create Account',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: AppColors.red,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 28,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
 
-                  // Name
-                  TextFormField(
-                    controller: _nameCtl,
-                    decoration: const InputDecoration(
-                      hintText: 'Name',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Please enter name'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
+                          // Email Field
+                          TextFormField(
+                            controller: _idCtl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              hintText: 'Email Address',
+                              prefixIcon: Icon(
+                                Icons.email_outlined,
+                                color: AppColors.red,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[200]!,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.red,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Please enter email'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
 
-                  // Password + toggle
-                  TextFormField(
-                    controller: _pwdCtl,
-                    obscureText: _obscurePwd,
-                    decoration: InputDecoration(
-                      hintText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePwd ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.black,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscurePwd = !_obscurePwd),
-                        tooltip: _obscurePwd
-                            ? 'Show password'
-                            : 'Hide password',
+                          // Username Field
+                          TextFormField(
+                            controller: _usernameCtl,
+                            decoration: InputDecoration(
+                              hintText: 'Username',
+                              prefixIcon: Icon(
+                                Icons.person_outline,
+                                color: AppColors.red,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[200]!,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.red,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Please enter username'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Field
+                          TextFormField(
+                            controller: _pwdCtl,
+                            obscureText: _obscurePwd,
+                            decoration: InputDecoration(
+                              hintText: 'Password',
+                              prefixIcon: Icon(
+                                Icons.lock_outline,
+                                color: AppColors.red,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[200]!,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePwd
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey[600],
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscurePwd = !_obscurePwd),
+                              ),
+                            ),
+                            validator: (v) => (v == null || v.length < 4)
+                                ? 'Minimum 4 characters'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Confirm Password Field
+                          TextFormField(
+                            controller: _pwd2Ctl,
+                            obscureText: _obscurePwd2,
+                            decoration: InputDecoration(
+                              hintText: 'Confirm Password',
+                              prefixIcon: Icon(
+                                Icons.lock_outline,
+                                color: AppColors.red,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[200]!,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.red,
+                                  width: 2,
+                                ),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePwd2
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey[600],
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePwd2 = !_obscurePwd2,
+                                ),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty)
+                                return 'Please confirm password';
+                              if (v != _pwdCtl.text)
+                                return 'Passwords do not match';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Register Button
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [AppColors.red, Color(0xFF9B4036)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.red,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Create Account',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Back to Login Button
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.gold,
+                                width: 2,
+                              ),
+                            ),
+                            child: OutlinedButton(
+                              onPressed: _loading
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide.none,
+                                foregroundColor: AppColors.gold,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Back to Login',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    validator: (v) =>
-                        (v == null || v.length < 6) ? 'Min 6 characters' : null,
                   ),
-                  const SizedBox(height: 12),
-
-                  // Again-Password + toggle
-                  TextFormField(
-                    controller: _pwd2Ctl,
-                    obscureText: _obscurePwd2,
-                    decoration: InputDecoration(
-                      hintText: 'Confirm-Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePwd2
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: Colors.black,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscurePwd2 = !_obscurePwd2),
-                        tooltip: _obscurePwd2
-                            ? 'Show password'
-                            : 'Hide password',
-                      ),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty)
-                        return 'Please re-enter password';
-                      if (v != _pwdCtl.text) return 'Passwords do not match';
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  ElevatedButton(
-                    onPressed: _loading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _loading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Confirm Register'),
-                  ),
-                  const SizedBox(height: 8),
-
-                  OutlinedButton(
-                    onPressed: _loading ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.gold, width: 2),
-                      foregroundColor: AppColors.gold,
-                    ),
-                    child: const Text('Back To Login'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

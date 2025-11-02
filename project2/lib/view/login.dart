@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:project2/view/approver/approve.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'register.dart';
 
 // ✅ import หน้าของแต่ละ Role
@@ -21,7 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   bool _obscurePwd = true;
 
-  final _api = AuthApi(); // mock API ด้านล่าง
+  final _api = AuthApi();
 
   @override
   void dispose() {
@@ -36,13 +37,12 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final role = await _api.login(
-        emailOrPhone: _idCtl.text.trim(),
+        username: _idCtl.text.trim(),
         password: _pwdCtl.text,
       );
 
       if (!mounted) return;
 
-      // ตรวจ role แล้วนำทางไปหน้าแต่ละ role
       Widget nextPage;
       switch (role) {
         case 'staff':
@@ -69,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
         context,
         MaterialPageRoute(builder: (_) => nextPage),
       );
-    } on Exception catch (e) {
+    } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
@@ -83,118 +83,287 @@ class _LoginPageState extends State<LoginPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // ===== โลโก้ QuickRoom =====
-                RichText(
-                  text: TextSpan(
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 28,
-                      fontFamily: 'Roboto',
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'Quick',
-                        style: TextStyle(color: AppColors.red),
-                      ),
-                      TextSpan(
-                        text: 'Room',
-                        style: TextStyle(color: AppColors.gold),
-                      ),
-                    ],
-                  ),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                elevation: 8,
+                shadowColor: AppColors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(height: 20),
-
-                // ===== ฟอร์ม Login =====
-                Form(
-                  key: _form,
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextFormField(
-                        controller: _idCtl,
-                        decoration: const InputDecoration(
-                          hintText: 'Username (staff / user / approver)',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Please enter username'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _pwdCtl,
-                        obscureText: _obscurePwd,
-                        decoration: InputDecoration(
-                          hintText: 'Password',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePwd
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: Colors.black,
-                            ),
-                            onPressed: () {
-                              setState(() => _obscurePwd = !_obscurePwd);
-                            },
+                      // ===== โลโก้พร้อมไอคอน =====
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.red, AppColors.red],
                           ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.red,
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                         ),
-                        validator: (v) =>
-                            (v == null || v.length < 6) ? 'Min 6 chars' : null,
+                        child: const Icon(
+                          Icons.meeting_room_rounded,
+                          size: 40,
+                          color: Colors.white,
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      ElevatedButton(
-                        onPressed: _loading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                      // ===== โลโก้ QuickRoom =====
+                      RichText(
+                        text: TextSpan(
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 32,
+                            fontFamily: 'Roboto',
+                            letterSpacing: 1.2,
+                          ),
+                          children: const [
+                            TextSpan(
+                              text: 'Quick',
+                              style: TextStyle(color: AppColors.red),
+                            ),
+                            TextSpan(
+                              text: 'Room',
+                              style: TextStyle(color: AppColors.gold),
+                            ),
+                          ],
                         ),
-                        child: _loading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Welcome back!',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // ===== ฟอร์ม Login =====
+                      Form(
+                        key: _form,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Username Field
+                            TextFormField(
+                              controller: _idCtl,
+                              decoration: InputDecoration(
+                                hintText: 'Username',
+                                prefixIcon: Icon(
+                                  Icons.person_outline,
+                                  color: AppColors.red,
                                 ),
-                              )
-                            : const Text('Login'),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterPage(),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[200]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.red,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Please enter username'
+                                  : null,
                             ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: AppColors.gold,
-                            width: 2,
-                          ),
-                          foregroundColor: AppColors.gold,
+                            const SizedBox(height: 16),
+
+                            // Password Field
+                            TextFormField(
+                              controller: _pwdCtl,
+                              obscureText: _obscurePwd,
+                              decoration: InputDecoration(
+                                hintText: 'Password',
+                                prefixIcon: Icon(
+                                  Icons.lock_outline,
+                                  color: AppColors.red,
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[200]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.red,
+                                    width: 2,
+                                  ),
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePwd
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: Colors.grey[600],
+                                  ),
+                                  onPressed: () {
+                                    setState(() => _obscurePwd = !_obscurePwd);
+                                  },
+                                ),
+                              ),
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter password'
+                                  : null,
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Login Button
+                            Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [AppColors.red, Color(0xFF9B4036)],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.red,
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _submit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Login',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Divider
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(color: Colors.grey[300]),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    'OR',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(color: Colors.grey[300]),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Register Button
+                            Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.gold,
+                                  width: 2,
+                                ),
+                              ),
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const RegisterPage(),
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide.none,
+                                  foregroundColor: AppColors.gold,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Create New Account',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Text('Register'),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -209,27 +378,27 @@ class AppColors {
   static const gold = Color(0xFFFFC107);
 }
 
-// ====== Mock API จำลองระบบ Login ======
+// ====== API เชื่อมกับ Node.js ======
 class AuthApi {
+  final String baseUrl = "http://192.168.1.112:3000";
+
   Future<String> login({
-    required String emailOrPhone,
+    required String username,
     required String password,
   }) async {
-    await Future.delayed(const Duration(seconds: 1));
+    final url = Uri.parse("$baseUrl/api/login");
 
-    // ✅ ตรวจรหัสผ่านจำลอง
-    if (password != '123456') throw Exception('Invalid password');
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
 
-    // ✅ จำลอง Role ตาม username
-    switch (emailOrPhone.toLowerCase()) {
-      case 'staff':
-        return 'staff';
-      case 'approver':
-        return 'approver';
-      case 'user':
-        return 'user';
-      default:
-        throw Exception('User not found');
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data['role'];
+    } else {
+      throw Exception("Invalid credentials or server error");
     }
   }
 }
