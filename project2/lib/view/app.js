@@ -1,95 +1,121 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
-const bcrypt = require("bcryptjs"); // ใช้สำหรับ hash และตรวจรหัสผ่าน
-const con = require("./config/db"); // เชื่อมกับฐานข้อมูล
-
+const bcrypt = require("bcryptjs");          
+const con = require("../config/db");         
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
 
-// ================================================================
-// ==================== REGISTER API ================================
-// ================================================================
+/* ================== Middlewares ================== */
+// รองรับเรียกจากมือถือ/Emulator และ body JSON
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/* ================== Health check ================== */
+app.get("/", (req, res) => {
+  res.send("Server is running and connected to MySQL ✅");
+});
+
+/* ================== Password hash utility (ชั่วคราว) ==================
+   ใช้สร้าง bcrypt hash เพื่ออัปเดตรหัสผ่านใน DB ด้วยมือ
+   เสร็จงานแล้ว 'แนะนำให้ลบออก' เพื่อความปลอดภัย
+*/
+app.get("/password/:password", (req, res) => {
+  const password = req.params.password;
+  bcrypt.hash(password, 10, (err, hash) => {
+    if (err) return res.status(500).send("Password Hashing Error");
+    res.status(200).send(hash);
+  });
+});
+
+/* ================== Debug: ดู DB ที่แอปกำลังเขียนจริง ==================
+   เปิดในเบราว์เซอร์: http://localhost:3000/__debug/users
+   จะเห็น current_db และ 10 ผู้ใช้ล่าสุด
+*/
+app.get("/__debug/users", (req, res) => {
+  con.query(
+    "SELECT DATABASE() AS current_db, id, username, user_email FROM `user` ORDER BY id DESC LIMIT 10",
+    (err, rows) => {
+      if (err) return res.status(500).json({ err });
+      res.json(rows);
+    }
+  );
+});
+
+/* ================== REGISTER ================== */
 app.post("/api/register", async (req, res) => {
-  const { email, username, password } = req.body;
+  const { email, username, password } = req.body || {};
 
-  // ตรวจว่ากรอกครบหรือไม่
-  if (!email || !username || !password)
+  if (!email || !username || !password) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
 
-  // ตรวจว่ามี username ซ้ำไหม
-  const checkSQL = "SELECT * FROM user WHERE username = ?";
-  con.query(checkSQL, [username], async (err, result) => {
+  // ตรวจ username ซ้ำ
+  con.query("SELECT 1 FROM `user` WHERE username = ?", [username], async (err, rows) => {
     if (err) return res.status(500).json({ message: "DB error" });
-    if (result.length > 0)
+    if (rows.length > 0) {
       return res.status(400).json({ message: "Username already exists" });
+    }
 
     try {
-      // เข้ารหัสรหัสผ่านก่อนเก็บ
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      // ✅ แก้ตำแหน่ง parameter ให้ถูก
-      const insertSQL =
-        "INSERT INTO user (username, password, role, user_email) VALUES (?, ?, ?, ?)";
-      con.query(insertSQL, [username, hashedPassword, 3, email], (err) => {
-        if (err) {
-          console.error("❌ Register failed:", err);
-          return res.status(500).json({ message: "Register failed" });
+      const hashed = await bcrypt.hash(password, 10);
+      con.query(
+        "INSERT INTO `user` (username, password, role, user_email) VALUES (?, ?, 3, ?)",
+        [username, hashed, email],
+        (err2, result) => {
+          if (err2) {
+            console.error("❌ Register failed:", err2);
+            return res.status(500).json({ message: "Register failed" });
+          }
+          console.log("✅ Register success:", { insertId: result.insertId, username, email });
+          return res.json({ message: "Register success", insertId: result.insertId });
         }
-        console.log("✅ Register success:", username);
-        res.json({ message: "Register success" });
-      });
-    } catch (error) {
-      console.error("❌ Hashing error:", error);
-      res.status(500).json({ message: "Hashing error" });
+      );
+    } catch (e) {
+      console.error("❌ Hashing error:", e);
+      return res.status(500).json({ message: "Hashing error" });
     }
   });
 });
 
-// ================================================================
-// ==================== LOGIN API ==================================
-// ================================================================
+/* ================== LOGIN ================== */
 app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
 
-  if (!username || !password)
+  if (!username || !password) {
     return res.status(400).json({ message: "Missing username or password" });
+  }
 
-  const sql = "SELECT * FROM user WHERE username = ?";
-  con.query(sql, [username], async (err, results) => {
+  con.query("SELECT * FROM `user` WHERE username = ?", [username], async (err, rows) => {
     if (err) return res.status(500).json({ message: "DB error" });
-    if (results.length === 0)
+    if (rows.length === 0) {
       return res.status(401).json({ message: "Invalid username or password" });
+    }
 
-    const user = results[0];
+    const user = rows[0];
 
-    // ✅ ตรวจสอบรหัสผ่าน — รองรับทั้ง plain text และ hashed
-    let isMatch = false;
+    // ตรวจว่าค่าใน DB เป็น hash ไหม (bcrypt ขึ้นต้นด้วย $2)
+    const isHashed = typeof user.password === "string" && user.password.startsWith("$2");
+    let ok = false;
+
     try {
-      if (user.password === password) {
-        // ถ้าเป็น plain text (เช่น user เก่าใน DB)
-        isMatch = true;
-      } else {
-        // ถ้าเป็น hash
-        isMatch = await bcrypt.compare(password, user.password);
-      }
-    } catch (compareErr) {
-      console.error("❌ bcrypt compare error:", compareErr);
+      ok = isHashed ? await bcrypt.compare(password, user.password)
+                    : (password === user.password); // รองรับบัญชีเก่า (plaintext) ชั่วคราว
+    } catch (e) {
+      console.error("❌ bcrypt compare error:", e);
       return res.status(500).json({ message: "Error checking password" });
     }
 
-    if (!isMatch)
+    if (!ok) {
       return res.status(401).json({ message: "Invalid username or password" });
+    }
 
-    // แปลง role เป็นชื่อ
-    let roleName = "user";
+    // map role → ชื่อ
+    let roleName = "user";        // 3=user
     if (user.role == 1) roleName = "approver";
     else if (user.role == 2) roleName = "staff";
 
     console.log(`✅ Login success: ${username} (${roleName})`);
-    res.json({
+    return res.json({
       message: "Login success",
       role: roleName,
       username: user.username,
@@ -98,12 +124,39 @@ app.post("/api/login", (req, res) => {
   });
 });
 
-// ================================================================
-// ==================== Role Staff (เพิ่ม API ภายหลังได้) ==========
-// ================================================================
 
-//--------------- START SERVER ------------------//
-const PORT = 3000;
+
+
+////////////////////////////////////////////////// user from BOOK //////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////// USER from jack //////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////// Staff from toon //////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////// Staff from opal //////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////// Approver from X //////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////// Approver from J //////////////////////////////////////////////////
+
+
+
+
+
+
+
+/* ================== Start server ================== */
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
