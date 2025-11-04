@@ -44,7 +44,7 @@ class _DashboardState extends State<Dashboard> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.1.112:3000/api/staff/dashboard"),
+        Uri.parse("http://192.168.1.123:3000/api/staff/dashboard"),
       );
 
       if (response.statusCode == 200) {
