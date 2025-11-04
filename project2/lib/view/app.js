@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const bcrypt = require("bcryptjs");          
-const con = require("../config/db");         
+const bcrypt = require("bcrypt");
+const con = require("../config/db");
 const app = express();
 
 /* ================== Middlewares ================== */
@@ -99,7 +99,7 @@ app.post("/api/login", (req, res) => {
 
     try {
       ok = isHashed ? await bcrypt.compare(password, user.password)
-                    : (password === user.password); // รองรับบัญชีเก่า (plaintext) ชั่วคราว
+        : (password === user.password); // รองรับบัญชีเก่า (plaintext) ชั่วคราว
     } catch (e) {
       console.error("❌ bcrypt compare error:", e);
       return res.status(500).json({ message: "Error checking password" });
@@ -117,6 +117,7 @@ app.post("/api/login", (req, res) => {
     console.log(`✅ Login success: ${username} (${roleName})`);
     return res.json({
       message: "Login success",
+      id: user.id,
       role: roleName,
       username: user.username,
       email: user.user_email,
@@ -128,7 +129,122 @@ app.post("/api/login", (req, res) => {
 
 
 ////////////////////////////////////////////////// user from BOOK //////////////////////////////////////////////////
+const moment = require("moment");
 
+// ================== GET all available rooms ==================
+app.get("/api/rooms", (req, res) => {
+  const today = moment().format("YYYY-MM-DD");
+
+  // First, make sure all rooms have today's date
+  con.query("UPDATE booking SET room_date = ? WHERE DATE(room_date) != ?", [today, today], (err) => {
+    if (err) console.error("⚠️ Error updating room dates:", err);
+
+    // Then fetch today's rooms
+    const sql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
+    con.query(sql, [today], (err2, results) => {
+      if (err2) {
+        console.error("❌ Error fetching rooms:", err2);
+        return res.status(500).json({ message: "Database error" });
+      }
+      res.json(results);
+    });
+  });
+});
+
+
+// ================== POST book a room ==================
+app.post("/api/book", (req, res) => {
+  const { user_id, room_id, time_slot, reason } = req.body || {};
+
+  if (!user_id || !room_id || !time_slot || !reason) {
+    return res.status(400).json({ message: "Missing booking data" });
+  }
+
+  // Convert slot number → column name
+  const timeSlotMap = {
+    1: "room_8AM",
+    2: "room_10AM",
+    3: "room_1PM",
+    4: "room_3PM",
+  };
+  const column = timeSlotMap[time_slot];
+  if (!column) {
+    return res.status(400).json({ message: "Invalid time slot" });
+  }
+
+  // 🧠 Step 1: Check if the user already has a booking today
+  const today = moment().format("YYYY-MM-DD");
+  const checkUserSql = `
+    SELECT COUNT(*) AS total
+    FROM booking_history
+    WHERE user_id = ? AND DATE(room_date) = ?
+  `;
+  con.query(checkUserSql, [user_id, today], (err, rows) => {
+    if (err) {
+      console.error("❌ Error checking user bookings:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
+
+    if (rows[0].total > 0) {
+      // User already booked today
+      return res.status(400).json(
+        "You already booked a room today. Only one booking per day is allowed.",
+      );
+    }
+
+    // 🧠 Step 2: Check if this room/time slot is available
+    con.query(
+      `SELECT ${column} FROM booking WHERE room_id = ?`,
+      [room_id],
+      (err2, rows2) => {
+        if (err2) {
+          console.error("❌ Error checking slot:", err2);
+          return res.status(500).json({ message: "Database error" });
+        }
+
+        if (!rows2.length) {
+          return res.status(404).json({ message: "Room not found" });
+        }
+
+        const status = rows2[0][column];
+        if (status !== 1) {
+          return res.status(400).json({ message: "Time slot not available" });
+        }
+
+        // 🧠 Step 3: Mark slot as pending
+        con.query(
+          `UPDATE booking SET ${column} = 2, room_date = NOW() WHERE room_id = ?`,
+          [room_id],
+          (err3) => {
+            if (err3) {
+              console.error("❌ Error updating slot:", err3);
+              return res.status(500).json({ message: "Update failed" });
+            }
+
+            // 🧠 Step 4: Record booking history
+            const insertSql = `
+              INSERT INTO booking_history (user_id, room_number, room_date, room_time, reason, status)
+              VALUES (?, ?, NOW(), ?, ?, '1')
+            `;
+            con.query(
+              insertSql,
+              [user_id, room_id, time_slot, reason],
+              (err4) => {
+                if (err4) {
+                  console.error("❌ Error inserting history:", err4);
+                  return res.status(500).json({ message: "Insert failed" });
+                }
+
+                console.log(`✅ Booking created by user ${user_id} for room ${room_id}`);
+                return res.json({ message: "Booking request submitted successfully" });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
 
 
 ////////////////////////////////////////////////// USER from jack //////////////////////////////////////////////////

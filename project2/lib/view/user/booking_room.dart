@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:project2/view/login.dart';
 import 'package:project2/view/user/booking_room2.dart';
 import 'history_user.dart';
@@ -8,53 +10,57 @@ class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
 
   @override
-  State<UserHomePage> createState() => _BookingRoomPageState();
+  State<UserHomePage> createState() => _UserHomePageState();
 }
 
-class _BookingRoomPageState extends State<UserHomePage> {
-  // Mock data (พร้อมสำหรับต่อ API ในอนาคต)
-  final List<Map<String, dynamic>> roomList = [
-    {
-      "roomName": "Room 100 (For 4 people)",
-      "image": "assets/images/Meeting-Room-B.jpg",
-      "slots": [
-        {"time": "8.00 - 10.00", "status": "Not Available"},
-        {"time": "10.00 - 12.00", "status": "Available"},
-        {"time": "13.00 - 15.00", "status": "Pending"},
-        {"time": "15.00 - 17.00", "status": "Reserved"},
-      ],
-    },
-    {
-      "roomName": "Room 101 (For 4 people)",
-      "image": "assets/images/Meeting-RoomA.jpg",
-      "slots": [
-        {"time": "8.00 - 10.00", "status": "Not Available"},
-        {"time": "10.00 - 12.00", "status": "Pending"},
-        {"time": "13.00 - 15.00", "status": "Available"},
-        {"time": "15.00 - 17.00", "status": "Reserved"},
-      ],
-    },
-    {
-      "roomName": "Room 102 (For 6 people)",
-      "image": "assets/images/Meeting-RoomC.jpg",
-      "slots": [
-        {"time": "8.00 - 10.00", "status": "Disable"},
-        {"time": "10.00 - 12.00", "status": "Disable"},
-        {"time": "13.00 - 15.00", "status": "Disable"},
-        {"time": "15.00 - 17.00", "status": "Disable"},
-      ],
-    },
-    {
-      "roomName": "Room 103 (For 8 people)",
-      "image": "assets/images/Meeting-RoomG.jpg",
-      "slots": [
-        {"time": "8.00 - 10.00", "status": "Not Available"},
-        {"time": "10.00 - 12.00", "status": "Pending"},
-        {"time": "13.00 - 15.00", "status": "Reserved"},
-        {"time": "15.00 - 17.00", "status": "Available"},
-      ],
-    },
-  ];
+class _UserHomePageState extends State<UserHomePage> {
+  List<dynamic> roomList = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchRooms();
+  }
+
+  Future<void> fetchRooms() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.1.123:3000/api/rooms'),
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          roomList = json.decode(response.body);
+          isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load rooms');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading rooms: $e')));
+    }
+  }
+
+  // Convert DB value (1–4) into readable text
+  String statusText(int value) {
+    switch (value) {
+      case 1:
+        return "Available";
+      case 2:
+        return "Pending";
+      case 3:
+        return "Reserved";
+      case 4:
+        return "Disable";
+      default:
+        return "Unknown";
+    }
+  }
 
   Color getStatusColor(String status) {
     switch (status) {
@@ -64,14 +70,33 @@ class _BookingRoomPageState extends State<UserHomePage> {
         return Colors.amber[700]!;
       case "Reserved":
         return Colors.orange;
-      case "Not Available":
-        return Colors.red;
       case "Disable":
         return Colors.grey;
+      case "Not Available":
+        return Colors.red;
       default:
         return Colors.black;
     }
   }
+
+bool isPastTime(String timeRange) {
+  final now = DateTime.now();
+
+  try {
+    // Extract start hour from "8.00 - 10.00"
+    final startPart = timeRange.split('-')[0].trim(); // "8.00"
+    final startHour = double.tryParse(startPart.replaceAll('.', ':')) ?? 0;
+
+    // Convert fractional hour (8.00, 13.00, etc.) to int hour
+    final hour = startHour.floor();
+
+    // Mark slot as past if current time >= that hour + 2 hours (slot duration)
+    return now.hour >= hour + 2;
+  } catch (e) {
+    print('Error parsing timeRange "$timeRange": $e');
+    return false;
+  }
+}
 
   void _logout() {
     showDialog(
@@ -126,32 +151,54 @@ class _BookingRoomPageState extends State<UserHomePage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: ListView(
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    "Room list",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    formattedDate,
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ...roomList.map((room) => _buildRoomCard(context, room)).toList(),
-            ],
-          ),
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          "Room list",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          formattedDate,
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ...roomList.map((room) => _buildRoomCard(context, room)),
+                  ],
+                ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
     );
   }
 
-  Widget _buildRoomCard(BuildContext context, Map<String, dynamic> room) {
+  Widget _buildRoomCard(BuildContext context, dynamic room) {
+    // Build slot list with time range and DB value
+    final slots = [
+      {"time": "8.00 - 10.00", "db": room['room_8AM']},
+      {"time": "10.00 - 12.00", "db": room['room_10AM']},
+      {"time": "13.00 - 15.00", "db": room['room_1PM']},
+      {"time": "15.00 - 17.00", "db": room['room_3PM']},
+    ];
+
+    // Convert DB + Time Logic
+    final slotList = slots.map((slot) {
+      String status = statusText(slot['db']);
+       if (isPastTime(slot['time'])) {
+         status = "Not Available";
+       }
+      return {"time": slot['time'], "status": status};
+    }).toList();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
@@ -164,7 +211,7 @@ class _BookingRoomPageState extends State<UserHomePage> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
-                room['image'],
+                'assets/images/${room['room_img']}',
                 height: 120,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -172,12 +219,12 @@ class _BookingRoomPageState extends State<UserHomePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              room['roomName'],
+              "Room ${room['room_number_id']} (For ${room['room_capacity']} people)",
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Column(
-              children: room['slots'].map<Widget>((slot) {
+              children: slotList.map<Widget>((slot) {
                 final statusColor = getStatusColor(slot['status']);
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -192,9 +239,11 @@ class _BookingRoomPageState extends State<UserHomePage> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => BookingRoomDetailPage(
-                                      roomName: room['roomName'],
+                                      roomName:
+                                          "Room ${room['room_number_id']} (For ${room['room_capacity']} people)",
                                       timeSlot: slot['time'],
-                                      image: room['image'],
+                                      image:
+                                          'assets/images/${room['room_img']}',
                                     ),
                                   ),
                                 );
@@ -202,7 +251,9 @@ class _BookingRoomPageState extends State<UserHomePage> {
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor,
                             borderRadius: BorderRadius.circular(8),
@@ -229,8 +280,18 @@ class _BookingRoomPageState extends State<UserHomePage> {
 
   String _monthName(int month) {
     const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
     return months[month - 1];
   }
@@ -248,21 +309,10 @@ class _BookingRoomPageState extends State<UserHomePage> {
               icon: Icons.home,
               label: 'HOME',
               onTap: () {
-                // อยู่หน้า Home แล้ว: reset stack ให้ชัดเจน
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const UserHomePage()),
                   (route) => false,
-                );
-              },
-            ),
-            _BottomNavItem(
-              icon: Icons.history,
-              label: 'History',
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HistoryPage()),
                 );
               },
             ),
@@ -277,10 +327,16 @@ class _BookingRoomPageState extends State<UserHomePage> {
               },
             ),
             _BottomNavItem(
-              icon: Icons.logout,
-              label: 'Logout',
-              onTap: _logout,
+              icon: Icons.history,
+              label: 'History',
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryPage()),
+                );
+              },
             ),
+            _BottomNavItem(icon: Icons.logout, label: 'Logout', onTap: _logout),
           ],
         ),
       ),
