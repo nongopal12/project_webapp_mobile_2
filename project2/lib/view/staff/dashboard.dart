@@ -1,11 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/history_staff.dart';
 import 'package:project2/view/staff/profile_staff.dart';
 
 class Dashboard extends StatefulWidget {
-  const Dashboard({super.key});
+  final String username; // 👈 เพิ่มตัวแปรรับ username
+
+  const Dashboard({super.key, required this.username});
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -13,7 +18,96 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   // ---------------------------------------------------------------
-  // Bottom Navigation
+  // Variables for Dashboard data
+  // ---------------------------------------------------------------
+  int enableCount = 0;
+  int pendingCount = 0;
+  int reservedCount = 0;
+  int disabledCount = 0;
+  bool isLoading = true;
+
+  // ---------------------------------------------------------------
+  // Variables for Profile data
+  // ---------------------------------------------------------------
+  String profileName = '';
+  String profileRole = '';
+  String profileId = '';
+  bool isProfileLoading = true;
+
+  // ---------------------------------------------------------------
+  // Fetch Dashboard Data
+  // ---------------------------------------------------------------
+  Future<void> _fetchDashboardData() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse("http://192.168.1.112:3000/api/staff/dashboard"),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          enableCount = int.tryParse(data["enable_count"].toString()) ?? 0;
+          pendingCount = int.tryParse(data["pending_count"].toString()) ?? 0;
+          reservedCount = int.tryParse(data["reserved_count"].toString()) ?? 0;
+          disabledCount = int.tryParse(data["disabled_count"].toString()) ?? 0;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("⚠️ Error fetching dashboard data: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Fetch Profile Data
+  // ---------------------------------------------------------------
+  Future<void> _fetchProfileData() async {
+    try {
+      // 👇 ใช้ widget.username แทน 'staff'
+      final username = widget.username;
+
+      final response = await http.get(
+        Uri.parse("http://192.168.1.112:3000/api/profile/$username"),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          profileName = data["username"] ?? '';
+          profileRole = data["role_name"] ?? '';
+          profileId = data["user_id"].toString();
+          isProfileLoading = false;
+        });
+      } else {
+        print(" Failed to load profile: ${response.statusCode}");
+        setState(() => isProfileLoading = false);
+      }
+    } catch (e) {
+      print("⚠️ Error fetching profile data: $e");
+      setState(() => isProfileLoading = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardData();
+    _fetchProfileData();
+  }
+
+  // ---------------------------------------------------------------
+  // Navigation
   // ---------------------------------------------------------------
   void _onItemTapped(int index) {
     switch (index) {
@@ -22,19 +116,25 @@ class _DashboardState extends State<Dashboard> {
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const Browser()),
+          MaterialPageRoute(
+            builder: (context) => Browser(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
       case 2:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HistoryStaff()),
+          MaterialPageRoute(
+            builder: (context) => HistoryStaff(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileStaff()),
+          MaterialPageRoute(
+            builder: (context) => ProfileStaff(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
     }
@@ -72,29 +172,6 @@ class _DashboardState extends State<Dashboard> {
               );
             },
             child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------
-  // Popup Message
-  // ---------------------------------------------------------------
-  void _showMailPopup() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text(' Messages'),
-        content: const Text(
-          'You have 99+ new messages',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
           ),
         ],
       ),
@@ -146,116 +223,81 @@ class _DashboardState extends State<Dashboard> {
       // ------------------------------------------------------------
       // BODY
       // ------------------------------------------------------------
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🔹 บรรทัด Dashboard + กล่องจดหมาย (อยู่นอกการ์ด)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Dashboard',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                GestureDetector(
-                  onTap: _showMailPopup,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF883C31),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              offset: const Offset(1, 2),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.mail,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Text(
-                            '99+',
-                            style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _fetchDashboardData();
+          await _fetchProfileData();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Dashboard',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              _buildProfileCard(context),
+              const SizedBox(height: 20),
+
+              if (isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: CircularProgressIndicator(),
                   ),
+                )
+              else
+                GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildDashboardCard(
+                      context,
+                      Icons.check,
+                      'Enable',
+                      enableCount,
+                      [Colors.green.shade50, Colors.green.shade300],
+                      Colors.green.shade800,
+                    ),
+                    _buildDashboardCard(
+                      context,
+                      Icons.hourglass_empty,
+                      'Pending',
+                      pendingCount,
+                      [Colors.yellow.shade50, Colors.yellow.shade400],
+                      Colors.yellow.shade800,
+                    ),
+                    _buildDashboardCard(
+                      context,
+                      Icons.lock_outline,
+                      'Reserved',
+                      reservedCount,
+                      [Colors.red.shade50, Colors.red.shade300],
+                      Colors.red.shade800,
+                    ),
+                    _buildDashboardCard(
+                      context,
+                      Icons.do_not_disturb_on_outlined,
+                      'Disabled',
+                      disabledCount,
+                      [Colors.blueGrey.shade50, Colors.blueGrey.shade300],
+                      Colors.blueGrey.shade800,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-            _buildProfileCard(context),
-            const SizedBox(height: 20),
-
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildDashboardCard(context, Icons.check, 'Enable', 10, [
-                  Colors.green.shade50,
-                  Colors.green.shade300,
-                ], Colors.green.shade800),
-                _buildDashboardCard(
-                  context,
-                  Icons.hourglass_empty,
-                  'Pending',
-                  5,
-                  [Colors.yellow.shade50, Colors.yellow.shade400],
-                  Colors.yellow.shade800,
-                ),
-                _buildDashboardCard(
-                  context,
-                  Icons.lock_outline,
-                  'Reserved',
-                  5,
-                  [Colors.red.shade50, Colors.red.shade300],
-                  Colors.red.shade800,
-                ),
-                _buildDashboardCard(
-                  context,
-                  Icons.do_not_disturb_on_outlined,
-                  'Disabled',
-                  7,
-                  [Colors.blueGrey.shade50, Colors.blueGrey.shade300],
-                  Colors.blueGrey.shade800,
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
 
       // ------------------------------------------------------------
-      // BOTTOM NAV
+      // BOTTOM NAVIGATION
       // ------------------------------------------------------------
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -275,9 +317,13 @@ class _DashboardState extends State<Dashboard> {
   }
 
   // ---------------------------------------------------------------
-  // Profile Card (เตี้ยและไม่ชน)
+  // Profile Card
   // ---------------------------------------------------------------
   Widget _buildProfileCard(BuildContext context) {
+    if (isProfileLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -300,39 +346,27 @@ class _DashboardState extends State<Dashboard> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Text(
-                  'Mr. Chayut Samanupawin',
-                  style: TextStyle(
+                  profileName,
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF883C31),
                   ),
                 ),
-                SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      'Status: ',
-                      style: TextStyle(fontSize: 11, color: Colors.black87),
-                    ),
-                    Text(
-                      'Normal',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
-                  'ID: 00002',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  'ID: ${profileId.padLeft(5, '0')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                Text('Position: Staff', style: TextStyle(fontSize: 11)),
+                Text(
+                  'Position: $profileRole',
+                  style: const TextStyle(fontSize: 11),
+                ),
               ],
             ),
           ),

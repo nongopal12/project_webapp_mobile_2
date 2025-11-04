@@ -46,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
       Widget nextPage;
       switch (role) {
         case 'staff':
-          nextPage = const Dashboard();
+          nextPage = Dashboard(username: _idCtl.text.trim());
           break;
         case 'approver':
           nextPage = const HomeApprover();
@@ -380,7 +380,7 @@ class AppColors {
 
 // ====== API เชื่อมกับ Node.js ======
 class AuthApi {
-  final String baseUrl = "http://192.168.1.123:3000";
+  final String baseUrl = "http://192.168.1.112:3000";
 
   Future<String> login({
     required String username,

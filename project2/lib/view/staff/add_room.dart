@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For TextInputFormatter
 
-/// หน้า Add Room (แบบจำลองยังไม่เชื่อม Database)
-/// Add Room screen (Frontend mock-up only)
+/// Add Room Page (Matches Database)
 class AddRoom extends StatefulWidget {
   const AddRoom({super.key});
 
@@ -11,12 +11,12 @@ class AddRoom extends StatefulWidget {
 
 class _AddRoomState extends State<AddRoom> {
   // ================================================================
-  // Section 1: ตัวแปรควบคุม (Controllers & Data)
+  // Section 1: Controllers & Data
   // ================================================================
-  final _nameController = TextEditingController();
+  final _roomNumberController = TextEditingController();
   final _locationController = TextEditingController();
+  final _capacityController = TextEditingController();
 
-  // รายการรูปภาพของห้อง
   final List<String> roomImages = [
     "assets/images/Meeting-RoomA.jpg",
     "assets/images/Meeting-Room-B.jpg",
@@ -27,15 +27,12 @@ class _AddRoomState extends State<AddRoom> {
     "assets/images/Meeting-RoomG.jpg",
     "assets/images/Meeting-RoomH.jpg",
   ];
-
   int _currentImageIndex = 0;
 
   // ================================================================
-  // Section 2: ฟังก์ชันควบคุมการแสดงผล (Functions)
+  // Section 2: Functions
   // ================================================================
 
-  /// เปลี่ยนภาพถัดไปหรือก่อนหน้า
-  /// Switch to next or previous image.
   void _changeImage(bool next) {
     setState(() {
       if (next) {
@@ -47,17 +44,16 @@ class _AddRoomState extends State<AddRoom> {
     });
   }
 
-  /// ฟังก์ชันเมื่อกด Accept (เพิ่มห้อง)
-  /// Validate input and return room data to parent.
+  /// Validate and return data
   void _acceptRoom() {
-    final name = _nameController.text.trim();
+    final roomNum = _roomNumberController.text.trim();
     final location = _locationController.text.trim();
+    final capacity = _capacityController.text.trim();
 
-    // ตรวจสอบว่ากรอกครบหรือไม่
-    if (name.isEmpty || location.isEmpty) {
+    if (roomNum.isEmpty || location.isEmpty || capacity.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please fill in both room name and location."),
+          content: Text("Please fill in all fields."),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.fixed,
         ),
@@ -65,30 +61,17 @@ class _AddRoomState extends State<AddRoom> {
       return;
     }
 
-    // แสดง SnackBar แจ้งเตือนว่าบันทึกสำเร็จ
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Room added successfully!"),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.fixed,
-      ),
-    );
-
-    // ส่งข้อมูลกลับไปยังหน้า Browser หลังจากดีเลย์เล็กน้อย
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        Navigator.of(context).pop({
-          'name': name,
-          'location': location,
-          'imagePath': roomImages[_currentImageIndex],
-          'status': 'Enable',
-        });
-      }
+    // Return the correct Map data
+    Navigator.of(context).pop({
+      'room_number': int.parse(roomNum),
+      'room_location': int.parse(location),
+      'room_capacity': int.parse(capacity),
+      'room_img': roomImages[_currentImageIndex],
     });
   }
 
   // ================================================================
-  // Section 3: ส่วนแสดงผลหลักของหน้า (UI)
+  // Section 3: UI Build
   // ================================================================
   @override
   Widget build(BuildContext context) {
@@ -96,9 +79,6 @@ class _AddRoomState extends State<AddRoom> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ------------------------------------------------------------
-          // Header
-          // ------------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -114,108 +94,117 @@ class _AddRoomState extends State<AddRoom> {
           ),
           const SizedBox(height: 16),
 
-          // ------------------------------------------------------------
-          // Room Image Viewer
-          // ------------------------------------------------------------
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: double.infinity,
-                  height: (MediaQuery.of(context).size.width - 80) * (9 / 16),
-                  color: Colors.grey[200],
-                  child: Image.asset(
-                    roomImages[_currentImageIndex],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 40,
-                        ),
-                      );
-                    },
+          // Image Viewer with Fixed Aspect Ratio
+          AspectRatio(
+            aspectRatio: 16 / 9, // ล็อคสัดส่วน 16:9
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: Colors.grey[200],
+                    child: Image.asset(
+                      roomImages[_currentImageIndex],
+                      fit: BoxFit.cover, // ครอบคลุมพื้นที่ทั้งหมดโดยตัดส่วนเกิน
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 40,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-              // ปุ่มเปลี่ยนภาพซ้าย
-              Positioned(
-                left: 8,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                  onPressed: () => _changeImage(false),
-                  style: IconButton.styleFrom(backgroundColor: Colors.black38),
-                ),
-              ),
-              // ปุ่มเปลี่ยนภาพขวา
-              Positioned(
-                right: 8,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => _changeImage(true),
-                  style: IconButton.styleFrom(backgroundColor: Colors.black38),
-                ),
-              ),
-              // ตัวเลขล่างแสดงลำดับภาพ
-              Positioned(
-                bottom: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "Image ${_currentImageIndex + 1} / ${roomImages.length}",
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                Positioned(
+                  left: 8,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    onPressed: () => _changeImage(false),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black38,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // ------------------------------------------------------------
-          // Room Name Input
-          // ------------------------------------------------------------
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: "Room Name",
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+                Positioned(
+                  right: 8,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => _changeImage(true),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black38,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "Image ${_currentImageIndex + 1} / ${roomImages.length}",
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          // ------------------------------------------------------------
-          // Location Input
-          // ------------------------------------------------------------
+          // Input Fields
           TextField(
             controller: _locationController,
             decoration: InputDecoration(
-              labelText: "Location",
+              labelText: "Floor (e.g., 1, 2, 3...)",
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _roomNumberController,
+            decoration: InputDecoration(
+              labelText: "Room Number (e.g., 1, 2, 3...)",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _capacityController,
+            decoration: InputDecoration(
+              labelText: "Capacity (e.g., 4, 6, 8...)",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 20),
 
-          // ------------------------------------------------------------
-          // Buttons (Cancel & Accept)
-          // ------------------------------------------------------------
+          // Buttons
           Row(
             children: [
               Expanded(

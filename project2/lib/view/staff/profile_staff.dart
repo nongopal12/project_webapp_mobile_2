@@ -3,19 +3,17 @@ import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/dashboard.dart';
 import 'package:project2/view/staff/history_staff.dart';
-import 'package:project2/view/staff/profile_staff.dart';
 
 class ProfileStaff extends StatefulWidget {
-  const ProfileStaff({super.key});
+  final String username; // 👈 เพิ่มตัวแปรรับ username
+
+  const ProfileStaff({super.key, required this.username});
 
   @override
   State<ProfileStaff> createState() => _ProfileStaffState();
 }
 
 class _ProfileStaffState extends State<ProfileStaff> {
-  // ================================================================
-  // ฟังก์ชัน Logout
-  // ================================================================
   void _logout() {
     showDialog(
       context: context,
@@ -51,27 +49,30 @@ class _ProfileStaffState extends State<ProfileStaff> {
     );
   }
 
-  // ================================================================
-  // การเปลี่ยนหน้า (Bottom Navigation)
-  // ================================================================
   void _onItemTapped(int index) {
     switch (index) {
       case 0:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const Dashboard()),
+          MaterialPageRoute(
+            builder: (context) => Dashboard(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const Browser()),
+          MaterialPageRoute(
+            builder: (context) => Browser(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
       case 2:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HistoryStaff()),
+          MaterialPageRoute(
+            builder: (context) => HistoryStaff(username: widget.username),
+          ), // 👈 ส่ง username
         );
         break;
       case 3:
@@ -79,18 +80,12 @@ class _ProfileStaffState extends State<ProfileStaff> {
     }
   }
 
-  // ================================================================
-  // Build หน้าโปรไฟล์ใหม่ (ใช้รูปภาพแทน UI การ์ด)
-  // ================================================================
   @override
   Widget build(BuildContext context) {
     final Color mainAppColor = Theme.of(context).primaryColor;
     final Color accentColor = Theme.of(context).colorScheme.secondary;
 
     return Scaffold(
-      // ------------------------------------------------------------
-      // AppBar ด้านบน
-      // ------------------------------------------------------------
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: RichText(
@@ -123,10 +118,6 @@ class _ProfileStaffState extends State<ProfileStaff> {
           child: Container(color: Colors.grey[300], height: 1.0),
         ),
       ),
-
-      // ------------------------------------------------------------
-      // BODY: แสดงภาพโปรไฟล์เต็มหน้า
-      // ------------------------------------------------------------
       body: Center(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -144,10 +135,6 @@ class _ProfileStaffState extends State<ProfileStaff> {
           ),
         ),
       ),
-
-      // ------------------------------------------------------------
-      // Bottom Navigation Bar
-      // ------------------------------------------------------------
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: mainAppColor,

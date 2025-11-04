@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// หน้าแก้ไขข้อมูลห้อง (Edit Room)
-/// ใช้ในฝั่ง Staff เพื่อจำลองการแก้ไขชื่อห้อง
+/// Edit Room Page (Shows Floor, but doesn't edit it)
 class EditRoom extends StatefulWidget {
   final String initialImagePath;
+  final int initialRoomNumber;
+  final int initialLocation; // To display Floor
+  final int initialCapacity;
 
   const EditRoom({
     super.key,
-    this.initialImagePath = "assets/images/Meeting-RoomF.jpg",
+    required this.initialImagePath,
+    required this.initialRoomNumber,
+    required this.initialLocation,
+    required this.initialCapacity,
   });
 
   @override
@@ -16,45 +22,55 @@ class EditRoom extends StatefulWidget {
 
 class _EditRoomState extends State<EditRoom> {
   // ================================================================
-  // Section 1: ตัวแปรและการตั้งค่าเริ่มต้น (State & Controller)
+  // Section 1: Controllers
   // ================================================================
-  late TextEditingController _nameController;
+  late TextEditingController _roomNumberController;
+  late TextEditingController _capacityController;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: "Room ");
+    _roomNumberController = TextEditingController(
+      text: widget.initialRoomNumber.toString(),
+    );
+    _capacityController = TextEditingController(
+      text: widget.initialCapacity.toString(),
+    );
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _roomNumberController.dispose();
+    _capacityController.dispose();
     super.dispose();
   }
 
   // ================================================================
-  // Section 2: ฟังก์ชันเมื่อกดปุ่ม Accept
+  // Section 2: Accept Function
   // ================================================================
   void _onAcceptPressed() {
-    final name = _nameController.text.trim();
+    final roomNum = _roomNumberController.text.trim();
+    final capacity = _capacityController.text.trim();
 
-    // ตรวจสอบการกรอกข้อมูล
-    if (name.isEmpty) {
+    if (roomNum.isEmpty || capacity.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Name cannot be empty"),
+          content: Text("Fields cannot be empty"),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    // ส่งค่าชื่อห้องใหม่กลับไปหน้า Browser
-    Navigator.of(context).pop(name);
+    // Return Map "without" location (as it wasn't edited)
+    Navigator.of(context).pop({
+      'room_number': int.parse(roomNum),
+      'room_capacity': int.parse(capacity),
+    });
   }
 
   // ================================================================
-  // Section 3: ส่วนสร้าง UI หลัก (Build Method)
+  // Section 3: UI Build
   // ================================================================
   @override
   Widget build(BuildContext context) {
@@ -63,9 +79,7 @@ class _EditRoomState extends State<EditRoom> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ------------------------------------------------------------
-          // Header (ชื่อหน้า + ปุ่มปิด)
-          // ------------------------------------------------------------
+          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -80,10 +94,7 @@ class _EditRoomState extends State<EditRoom> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // ------------------------------------------------------------
-          // รูปภาพของห้อง
-          // ------------------------------------------------------------
+          // Image
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Container(
@@ -105,27 +116,56 @@ class _EditRoomState extends State<EditRoom> {
           ),
           const SizedBox(height: 16),
 
-          // ------------------------------------------------------------
-          // ช่องกรอกชื่อห้อง (Text Field)
-          // ------------------------------------------------------------
+          // Input Fields
+
+          // Read-only Floor display
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[400]!),
+            ),
+            child: Text(
+              "Floor: ${widget.initialLocation}",
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Editable Room Number
           TextField(
-            controller: _nameController,
+            controller: _roomNumberController,
             decoration: InputDecoration(
-              labelText: "Room Name",
+              labelText: "Room Number (on this floor)",
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 12),
+
+          // Editable Capacity
+          TextField(
+            controller: _capacityController,
+            decoration: InputDecoration(
+              labelText: "Capacity (e.g., 4, 6, 8...)",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 20),
 
-          // ------------------------------------------------------------
-          // ปุ่ม Cancel และ Accept
-          // ------------------------------------------------------------
+          // Buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ปุ่ม Cancel
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: TextButton.styleFrom(
@@ -139,8 +179,6 @@ class _EditRoomState extends State<EditRoom> {
                 child: const Text("Cancel"),
               ),
               const SizedBox(width: 16),
-
-              // ปุ่ม Accept
               ElevatedButton(
                 onPressed: _onAcceptPressed,
                 style: ElevatedButton.styleFrom(
