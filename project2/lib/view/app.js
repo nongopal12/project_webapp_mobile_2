@@ -132,26 +132,7 @@ app.post("/api/login", (req, res) => {
 
 
 ////////////////////////////////////////////////// USER from jack //////////////////////////////////////////////////
-// ================== USER BOOKING HISTORY ==================
-app.get("/api/user/history/:uid", (req, res) => {
-  const uid = req.params.uid;
-  const sql = `
-    SELECT bh.id, b.room_number, b.room_location, bh.room_date, bh.room_time, bh.reason, bh.status
-    FROM booking_history bh
-    JOIN booking b ON bh.room_number = b.room_id
-    WHERE bh.user_id = ?
-    ORDER BY bh.room_date DESC
-  `;
-  con.query(sql, [uid], (err, result) => {
-    if (err) {
-      console.error("❌ Error fetching history:", err.message);
-      return res.status(500).send("Database server error");
-    }
-    res.json(result);
-  });
-});
-
-// ================== USER CHECK STATUS ==================
+/* ================== USER STATUS ================== */
 app.get("/api/user/status/:uid", (req, res) => {
   const uid = req.params.uid;
   const sql = `
@@ -159,13 +140,63 @@ app.get("/api/user/status/:uid", (req, res) => {
     FROM booking_history bh
     JOIN booking b ON bh.room_number = b.room_id
     WHERE bh.user_id = ?
-    AND bh.status IN ('1','2','3')
     ORDER BY bh.room_date DESC
   `;
   con.query(sql, [uid], (err, result) => {
     if (err) {
       console.error("❌ Error fetching status:", err.message);
       return res.status(500).send("Database server error");
+    }
+    res.json(result);
+  });
+});
+/* ================== USER CHECK STATUS (Pending only) ================== */
+app.get("/api/user/checkstatus/:uid", (req, res) => {
+  const uid = req.params.uid;
+  const sql = `
+    SELECT 
+      bh.id,
+      b.room_number,
+      b.room_location,
+      bh.room_date,
+      bh.room_time,
+      bh.reason,
+      bh.status
+    FROM booking_history bh
+    JOIN booking b ON bh.room_number = b.room_id
+    WHERE bh.user_id = ? AND bh.status = '1'
+    ORDER BY bh.room_date DESC
+  `;
+  con.query(sql, [uid], (err, result) => {
+    if (err) {
+      console.error("❌ Error fetching pending status:", err.message);
+      return res.status(500).send("Database error while fetching pending");
+    }
+    res.json(result);
+  });
+});
+
+/* ================== USER HISTORY (Approved & Rejected only) ================== */
+app.get("/api/user/history/:uid", (req, res) => {
+  const uid = req.params.uid;
+  const sql = `
+    SELECT 
+      bh.id,
+      b.room_number,
+      b.room_location,
+      bh.room_date,
+      bh.room_time,
+      bh.reason,
+      bh.status
+    FROM booking_history bh
+    JOIN booking b ON bh.room_number = b.room_id
+    WHERE bh.user_id = ? AND bh.status IN ('2', '3')
+    ORDER BY bh.room_date DESC
+  `;
+  con.query(sql, [uid], (err, result) => {
+    if (err) {
+      console.error("❌ Error fetching history:", err.message);
+      return res.status(500).send("Database error while fetching history");
     }
     res.json(result);
   });

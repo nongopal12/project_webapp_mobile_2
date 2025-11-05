@@ -380,7 +380,7 @@ class AppColors {
 
 // ====== API เชื่อมกับ Node.js ======
 class AuthApi {
-  final String baseUrl = "http://192.168.1.112:3000";
+  final String baseUrl = "http://192.168.1.123:3000";
 
   Future<String> login({
     required String username,
