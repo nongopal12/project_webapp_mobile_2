@@ -26,7 +26,7 @@ class _UserHomePageState extends State<UserHomePage> {
   Future<void> fetchRooms() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.123:3000/api/rooms'),
+        Uri.parse('http://172.27.11.178:3000/api/rooms'),
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -79,24 +79,26 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-bool isPastTime(String timeRange) {
-  final now = DateTime.now();
+  bool isPastTime(String timeRange) {
+    final now = DateTime.now(); // ใช้เวลาปัจจุบันของเครื่อง
+    try {
+      final parts = timeRange.split('-'); // ["8.00 ", " 10.00"]
+      if (parts.length != 2) return false;
 
-  try {
-    // Extract start hour from "8.00 - 10.00"
-    final startPart = timeRange.split('-')[0].trim(); // "8.00"
-    final startHour = double.tryParse(startPart.replaceAll('.', ':')) ?? 0;
+      DateTime parsePart(String s) {
+        final t = s.trim(); // "8.00"
+        final hm = t.split('.'); // ["8","00"]
+        final h = int.parse(hm[0]);
+        final m = (hm.length > 1) ? int.parse(hm[1]) : 0;
+        return DateTime(now.year, now.month, now.day, h, m);
+      }
 
-    // Convert fractional hour (8.00, 13.00, etc.) to int hour
-    final hour = startHour.floor();
-
-    // Mark slot as past if current time >= that hour + 2 hours (slot duration)
-    return now.hour >= hour + 2;
-  } catch (e) {
-    print('Error parsing timeRange "$timeRange": $e');
-    return false;
+      final end = parsePart(parts[1]); // เวลา “สิ้นสุดช่วง”
+      return now.isAfter(end); // หมดเวลาแล้วหรือยัง
+    } catch (_) {
+      return false;
+    }
   }
-}
 
   void _logout() {
     showDialog(
@@ -193,9 +195,9 @@ bool isPastTime(String timeRange) {
     // Convert DB + Time Logic
     final slotList = slots.map((slot) {
       String status = statusText(slot['db']);
-       if (isPastTime(slot['time'])) {
-         status = "Not Available";
-       }
+      if (isPastTime(slot['time'])) {
+        status = "Not Available";
+      }
       return {"time": slot['time'], "status": status};
     }).toList();
 

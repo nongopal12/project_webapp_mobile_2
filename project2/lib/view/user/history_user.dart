@@ -18,7 +18,7 @@ class _HistoryPageState extends State<HistoryPage> {
   List<dynamic> bookingHistory = [];
   bool _loading = true;
 
-  final String baseUrl = "http://192.168.1.123:3000";
+  final String baseUrl = "http://172.27.11.178:3000";
 
   @override
   void initState() {

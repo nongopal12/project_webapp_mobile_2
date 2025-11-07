@@ -16,7 +16,7 @@ class CheckStatusPage extends StatefulWidget {
 class _CheckStatusPageState extends State<CheckStatusPage> {
   List<dynamic> bookingList = [];
   bool _loading = true;
-  final String baseUrl = "http://192.168.1.123:3000";
+  final String baseUrl = "http://172.27.11.178:3000";
 
   @override
   void initState() {

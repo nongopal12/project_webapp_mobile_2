@@ -58,7 +58,7 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.123:3000/api/book'),
+        Uri.parse('http://172.27.11.178:3000/api/book'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'user_id': userId,
