@@ -173,6 +173,15 @@ class _UserHomePageState extends State<UserHomePage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "Press Available to book a room.",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.black54,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     ...roomList.map((room) => _buildRoomCard(context, room)),
                   ],
@@ -222,6 +231,11 @@ class _UserHomePageState extends State<UserHomePage> {
             const SizedBox(height: 8),
             Text(
               "Room ${room['room_number_id']} (For ${room['room_capacity']} people)",
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Floor: ${room['room_location']}",
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
