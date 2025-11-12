@@ -637,16 +637,72 @@ app.get("/api/profile/:username", (req, res) => {
 
 
 
-
-////////////////////////////////////////////////// Staff from opal //////////////////////////////////////////////////
-
-
-
 ////////////////////////////////////////////////// Approver from X //////////////////////////////////////////////////
 
 
 
 ////////////////////////////////////////////////// Approver from J //////////////////////////////////////////////////
+app.get("/api/history", (req, res) => {
+  const { date } = req.query;
+  console.log("📅 Filter date from Flutter:", date);
+
+  const params = [];
+
+  // ✅ เฉพาะ status 2 (Approved) และ 3 (Rejected)
+  let sql = `
+    SELECT 
+      h.id,
+      u.username AS booking_name,
+      u.user_email,
+      b.room_number AS room_number,
+      DATE_FORMAT(h.room_date, '%Y-%m-%d') AS room_date,
+      CASE 
+        WHEN h.room_time = 1 THEN '08:00 - 10:00'
+        WHEN h.room_time = 2 THEN '10:00 - 12:00'
+        WHEN h.room_time = 3 THEN '13:00 - 15:00'
+        WHEN h.room_time = 4 THEN '15:00 - 17:00'
+        ELSE 'Unknown'
+      END AS room_time,
+      h.reason,
+      h.status
+    FROM booking_history h
+    JOIN \`user\` u ON h.user_id = u.id
+    JOIN booking b ON h.room_number = b.room_id
+    WHERE h.status IN (2, 3)
+  `;
+
+  // ✅ ถ้ามีการส่ง date จาก Flutter ให้เพิ่มเงื่อนไขกรองวันที่
+  if (date) {
+    sql += ` AND DATE_FORMAT(h.room_date, '%Y-%m-%d') = ? `;
+    params.push(date);
+    console.log("🧠 SQL Filter Active:", sql, params);
+  } else {
+    console.log("📜 Showing all approved/rejected (no date filter)");
+  }
+
+  sql += " ORDER BY h.room_date DESC, h.room_time ASC";
+
+  con.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching history:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    // ✅ ปรับโครงสร้างผลลัพธ์ก่อนส่งกลับ
+    const formatted = results.map((row) => ({
+      id: row.id,
+      name: row.booking_name,
+      user_email: row.user_email,
+      room_number: `Room ${row.room_number}`,
+      room_date: row.room_date,
+      time: row.room_time,
+      reason: row.reason,
+      status: row.status,
+    }));
+
+    res.json(formatted);
+  });
+});
 
 
 
