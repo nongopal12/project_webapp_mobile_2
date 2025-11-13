@@ -1,7 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const path = require("path");
+const moment = require("moment");
 const con = require("../config/db");
+
 const app = express();
 
 /* ================== Middlewares ================== */
@@ -9,6 +12,10 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/* ================== Static assets สำหรับรูปห้อง ================== */
+// ตัวอย่าง: backend/assets/Meeting-RoomA.jpg
+app.use("/assets", express.static(path.join(__dirname, "../assets")));
 
 /* ================== Health check ================== */
 app.get("/", (req, res) => {
@@ -50,31 +57,42 @@ app.post("/api/register", async (req, res) => {
   }
 
   // ตรวจ username ซ้ำ
-  con.query("SELECT 1 FROM `user` WHERE username = ?", [username], async (err, rows) => {
-    if (err) return res.status(500).json({ message: "DB error" });
-    if (rows.length > 0) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
+  con.query(
+    "SELECT 1 FROM `user` WHERE username = ?",
+    [username],
+    async (err, rows) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      if (rows.length > 0) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
 
-    try {
-      const hashed = await bcrypt.hash(password, 10);
-      con.query(
-        "INSERT INTO `user` (username, password, role, user_email) VALUES (?, ?, 3, ?)",
-        [username, hashed, email],
-        (err2, result) => {
-          if (err2) {
-            console.error("❌ Register failed:", err2);
-            return res.status(500).json({ message: "Register failed" });
+      try {
+        const hashed = await bcrypt.hash(password, 10);
+        con.query(
+          "INSERT INTO `user` (username, password, role, user_email) VALUES (?, ?, 3, ?)",
+          [username, hashed, email],
+          (err2, result) => {
+            if (err2) {
+              console.error("❌ Register failed:", err2);
+              return res.status(500).json({ message: "Register failed" });
+            }
+            console.log("✅ Register success:", {
+              insertId: result.insertId,
+              username,
+              email,
+            });
+            return res.json({
+              message: "Register success",
+              insertId: result.insertId,
+            });
           }
-          console.log("✅ Register success:", { insertId: result.insertId, username, email });
-          return res.json({ message: "Register success", insertId: result.insertId });
-        }
-      );
-    } catch (e) {
-      console.error("❌ Hashing error:", e);
-      return res.status(500).json({ message: "Hashing error" });
+        );
+      } catch (e) {
+        console.error("❌ Hashing error:", e);
+        return res.status(500).json({ message: "Hashing error" });
+      }
     }
-  });
+  );
 });
 
 /* ================== LOGIN ================== */
@@ -85,72 +103,77 @@ app.post("/api/login", (req, res) => {
     return res.status(400).json({ message: "Missing username or password" });
   }
 
-  con.query("SELECT * FROM `user` WHERE username = ?", [username], async (err, rows) => {
-    if (err) return res.status(500).json({ message: "DB error" });
-    if (rows.length === 0) {
-      return res.status(401).json({ message: "Invalid username or password" });
+  con.query(
+    "SELECT * FROM `user` WHERE username = ?",
+    [username],
+    async (err, rows) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      if (rows.length === 0) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      const user = rows[0];
+
+      // ตรวจว่าค่าใน DB เป็น hash ไหม (bcrypt ขึ้นต้นด้วย $2)
+      const isHashed =
+        typeof user.password === "string" && user.password.startsWith("$2");
+      let ok = false;
+
+      try {
+        ok = isHashed
+          ? await bcrypt.compare(password, user.password)
+          : password === user.password; // รองรับบัญชีเก่า (plaintext) ชั่วคราว
+      } catch (e) {
+        console.error("❌ bcrypt compare error:", e);
+        return res.status(500).json({ message: "Error checking password" });
+      }
+
+      if (!ok) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // map role → ชื่อ
+      let roleName = "user"; // 3=user
+      if (user.role == 1) roleName = "approver";
+      else if (user.role == 2) roleName = "staff";
+
+      console.log(`✅ Login success: ${username} (${roleName})`);
+      return res.json({
+        message: "Login success",
+        id: user.id,
+        role: roleName,
+        username: user.username,
+        email: user.user_email,
+      });
     }
-
-    const user = rows[0];
-
-    // ตรวจว่าค่าใน DB เป็น hash ไหม (bcrypt ขึ้นต้นด้วย $2)
-    const isHashed = typeof user.password === "string" && user.password.startsWith("$2");
-    let ok = false;
-
-    try {
-      ok = isHashed ? await bcrypt.compare(password, user.password)
-        : (password === user.password); // รองรับบัญชีเก่า (plaintext) ชั่วคราว
-    } catch (e) {
-      console.error("❌ bcrypt compare error:", e);
-      return res.status(500).json({ message: "Error checking password" });
-    }
-
-    if (!ok) {
-      return res.status(401).json({ message: "Invalid username or password" });
-    }
-
-    // map role → ชื่อ
-    let roleName = "user";        // 3=user
-    if (user.role == 1) roleName = "approver";
-    else if (user.role == 2) roleName = "staff";
-
-    console.log(`✅ Login success: ${username} (${roleName})`);
-    return res.json({
-      message: "Login success",
-      id: user.id,
-      role: roleName,
-      username: user.username,
-      email: user.user_email,
-    });
-  });
+  );
 });
 
-
-
-
-////////////////////////////////////////////////// user from BOOK //////////////////////////////////////////////////
-const moment = require("moment");
+////////////////////////////////////////////////// USER from BOOK //////////////////////////////////////////////////
 
 // ================== GET all available rooms ==================
 app.get("/api/rooms", (req, res) => {
   const today = moment().format("YYYY-MM-DD");
 
   // First, make sure all rooms have today's date
-  con.query("UPDATE booking SET room_date = ? WHERE DATE(room_date) != ?", [today, today], (err) => {
-    if (err) console.error("⚠️ Error updating room dates:", err);
+  con.query(
+    "UPDATE booking SET room_date = ? WHERE DATE(room_date) != ?",
+    [today, today],
+    (err) => {
+      if (err) console.error("⚠️ Error updating room dates:", err);
 
-    // Then fetch today's rooms
-    const sql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
-    con.query(sql, [today], (err2, results) => {
-      if (err2) {
-        console.error("❌ Error fetching rooms:", err2);
-        return res.status(500).json({ message: "Database error" });
-      }
-      res.json(results);
-    });
-  });
+      // Then fetch today's rooms
+      const sql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
+      con.query(sql, [today], (err2, results) => {
+        if (err2) {
+          console.error("❌ Error fetching rooms:", err2);
+          return res.status(500).json({ message: "Database error" });
+        }
+        res.json(results);
+      });
+    }
+  );
 });
-
 
 // ================== POST book a room ==================
 app.post("/api/book", (req, res) => {
@@ -187,9 +210,11 @@ app.post("/api/book", (req, res) => {
 
     if (rows[0].total > 0) {
       // User already booked today
-      return res.status(400).json(
-        "You already booked a room today. Only one booking per day is allowed.",
-      );
+      return res
+        .status(400)
+        .json(
+          "You already booked a room today. Only one booking per day is allowed."
+        );
     }
 
     // 🧠 Step 2: Check if this room/time slot is available
@@ -235,8 +260,12 @@ app.post("/api/book", (req, res) => {
                   return res.status(500).json({ message: "Insert failed" });
                 }
 
-                console.log(`✅ Booking created by user ${user_id} for room ${room_id}`);
-                return res.json({ message: "Booking request submitted successfully" });
+                console.log(
+                  `✅ Booking created by user ${user_id} for room ${room_id}`
+                );
+                return res.json({
+                  message: "Booking request submitted successfully",
+                });
               }
             );
           }
@@ -246,8 +275,8 @@ app.post("/api/book", (req, res) => {
   });
 });
 
-
 ////////////////////////////////////////////////// USER from jack //////////////////////////////////////////////////
+
 /* ================== USER STATUS ================== */
 app.get("/api/user/status/:uid", (req, res) => {
   const uid = req.params.uid;
@@ -266,6 +295,7 @@ app.get("/api/user/status/:uid", (req, res) => {
     res.json(result);
   });
 });
+
 /* ================== USER CHECK STATUS (Pending only) ================== */
 app.get("/api/user/checkstatus/:uid", (req, res) => {
   const uid = req.params.uid;
@@ -318,11 +348,9 @@ app.get("/api/user/history/:uid", (req, res) => {
   });
 });
 
-
 ////////////////////////////////////////////////// Staff from toon //////////////////////////////////////////////////
 
 // ==================== API dashborad staff =======================
-
 app.get("/api/staff/dashboard", (req, res) => {
   const sql = `
     SELECT 
@@ -353,9 +381,7 @@ app.get("/api/staff/dashboard", (req, res) => {
   });
 });
 
-
 // ==================== API Get Data Room for staff ===================== //
-
 app.get("/api/staff/rooms", (req, res) => {
   const sql = `
     SELECT 
@@ -392,11 +418,8 @@ app.get("/api/staff/rooms", (req, res) => {
   });
 });
 
-
 // ====================  Add Room Staff ===================== //
-
 app.post("/api/staff/rooms", (req, res) => {
-
   const { room_number, room_location, room_capacity, room_img } = req.body;
 
   if (!room_number || !room_location || !room_capacity || !room_img) {
@@ -404,7 +427,7 @@ app.post("/api/staff/rooms", (req, res) => {
   }
 
   // แยกเอาเฉพาะชื่อไฟล์ภาพ
-  const imageName = room_img.split('/').pop();
+  const imageName = room_img.split("/").pop();
   const sqlInsert = `
     INSERT INTO booking 
       (room_number, room_location, room_capacity, room_img, room_date, room_8AM, room_10AM, room_1PM, room_3PM) 
@@ -422,24 +445,25 @@ app.post("/api/staff/rooms", (req, res) => {
       }
 
       const newRoomId = result.insertId;
-      const sqlUpdateId = "UPDATE booking SET room_number_id = ? WHERE room_id = ?";
-      
+      const sqlUpdateId =
+        "UPDATE booking SET room_number_id = ? WHERE room_id = ?";
+
       con.query(sqlUpdateId, [newRoomId, newRoomId], () => {
-         res.status(201).json({ message: "Room created successfully" });
+        res.status(201).json({ message: "Room created successfully" });
       });
     }
   );
 });
 
-
 // ====================  Edit Room Staff ===================== //
-
 app.put("/api/staff/rooms/:id", (req, res) => {
   const { id } = req.params;
-  const { room_number, room_capacity } = req.body; 
+  const { room_number, room_capacity } = req.body;
 
-  if (!room_number || !room_capacity) { 
-    return res.status(400).json({ message: "Missing required fields: room_number, room_capacity" });
+  if (!room_number || !room_capacity) {
+    return res
+      .status(400)
+      .json({ message: "Missing required fields: room_number, room_capacity" });
   }
 
   const sql = `
@@ -448,8 +472,8 @@ app.put("/api/staff/rooms/:id", (req, res) => {
       room_number = ?, 
       room_capacity = ?
     WHERE room_id = ?
-  `; 
-  con.query(sql, [room_number, room_capacity, id], (err, result) => { 
+  `;
+  con.query(sql, [room_number, room_capacity, id], (err, result) => {
     if (err) {
       console.error("DB error /api/staff/rooms (PUT):", err);
       return res.status(500).json({ message: "Failed to update room" });
@@ -461,9 +485,7 @@ app.put("/api/staff/rooms/:id", (req, res) => {
   });
 });
 
-
 // ==================== Disable Room Staff ===================== //
-
 app.put("/api/staff/rooms/:id/status", (req, res) => {
   const { id } = req.params;
   const { status } = req.body; // รับ "Enable" หรือ "Disable"
@@ -504,8 +526,7 @@ app.put("/api/staff/rooms/:id/status", (req, res) => {
   });
 });
 
-
-// ==================== API History staff ====================== //
+// ==================== API History staff (เวอร์ชันใหม่ มี image) ====================== //
 app.get("/api/staff/history", (req, res) => {
   const sql = `
     SELECT 
@@ -526,7 +547,9 @@ app.get("/api/staff/history", (req, res) => {
         WHEN '2' THEN 'Approved'
         WHEN '3' THEN 'Reject' 
         ELSE 'Unknown' 
-      END AS status
+      END AS status,
+      -- ✅ เอาชื่อไฟล์รูปห้องออกมาด้วย
+      b.room_img AS image
     FROM 
       booking_history AS h
     JOIN 
@@ -546,10 +569,7 @@ app.get("/api/staff/history", (req, res) => {
   });
 });
 
-
-
 // ====================  UPDATE STATUS Dashboard page (Can be use all role) ==================== //
-
 app.put("/api/approver/booking/:id", (req, res) => {
   const { id } = req.params;
   const { status } = req.body; // 2=approve, 3=reject
@@ -562,15 +582,19 @@ app.put("/api/approver/booking/:id", (req, res) => {
   con.query(updateHistory, [status, id], (err, result) => {
     if (err) {
       console.error("DB error /api/approver/booking (UPDATE history):", err);
-      return res.status(500).json({ message: "Failed to update booking history" });
+      return res
+        .status(500)
+        .json({ message: "Failed to update booking history" });
     }
 
     // ดึงข้อมูล booking_history ที่เพิ่งอัปเดต เพื่อเอาค่า room_number และ room_time ไปอัปเดตใน booking
     const getHistory =
       "SELECT room_number, room_time FROM booking_history WHERE id = ?";
-    con.query(getHistory, [id], (err, rows) => {
-      if (err || rows.length === 0)
-        return res.status(404).json({ message: "Booking history not found" });
+    con.query(getHistory, [id], (err2, rows) => {
+      if (err2 || rows.length === 0)
+        return res
+          .status(404)
+          .json({ message: "Booking history not found" });
 
       const { room_number, room_time } = rows[0];
 
@@ -585,11 +609,14 @@ app.put("/api/approver/booking/:id", (req, res) => {
       // ถ้า Reject ให้ค่าคอลัมน์นั้น = 1 (Free)
       const newStatus = status === "2" ? 3 : 1;
 
-      const updateBooking = `UPDATE booking SET ${timeColumn} = ? WHERE room_id = ?`;
-      con.query(updateBooking, [newStatus, room_number], (err2) => {
-        if (err2) {
-          console.error("DB error /api/approver/booking (UPDATE booking):", err2);
-          return res.status(500).json({ message: "Failed to update booking table" });
+      const updateBooking =
+        "UPDATE booking SET " + timeColumn + " = ? WHERE room_id = ?";
+      con.query(updateBooking, [newStatus, room_number], (err3) => {
+        if (err3) {
+          console.error("DB error /api/approver/booking (UPDATE booking):", err3);
+          return res
+            .status(500)
+            .json({ message: "Failed to update booking table" });
         }
         res.json({
           message:
@@ -602,7 +629,7 @@ app.put("/api/approver/booking/:id", (req, res) => {
   });
 });
 
-// ==================== API PROFILE CARD For staff ========================== //
+// ==================== API PROFILE CARD For staff/approver/user ========================== //
 app.get("/api/profile/:username", (req, res) => {
   const { username } = req.params;
 
@@ -635,13 +662,9 @@ app.get("/api/profile/:username", (req, res) => {
   });
 });
 
+////////////////////////////////////////////////// Approver from J (เพิ่มมาจากไฟล์แรก) //////////////////////////////////////////////////
 
-
-////////////////////////////////////////////////// Approver from X //////////////////////////////////////////////////
-
-
-
-////////////////////////////////////////////////// Approver from J //////////////////////////////////////////////////
+// ✅ API HISTORY FOR APPROVER (filter ตามวันที่ได้)
 app.get("/api/history", (req, res) => {
   const { date } = req.query;
   console.log("📅 Filter date from Flutter:", date);
@@ -703,12 +726,6 @@ app.get("/api/history", (req, res) => {
     res.json(formatted);
   });
 });
-
-
-
-
-
-
 
 /* ================== Start server ================== */
 const PORT = process.env.PORT || 3000;

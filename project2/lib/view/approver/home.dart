@@ -1,16 +1,25 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:project2/view/approver/checkstatus_approver.dart';
 import 'package:project2/view/approver/history_approver.dart';
 import 'package:project2/view/approver/proflie.dart';
 import 'package:project2/view/login.dart';
 import 'approve.dart';
 import 'proflie.dart';
+import 'approve_detail.dart'; // <-- หน้าใหม่ที่เราจะสร้าง
+import 'room_browser.dart';
+
+/// ===== Backend base URL =====
+const String kBaseUrl = "http://192.168.1.123:3000";
 
 /// ===== THEME (โทนสี QuickRoom) =====
 class QColors {
-  static const Color bg = Color(0xFFF7F7F9); // ขาวนวล 60%
-  static const Color primaryRed = Color(0xFF7A2E22); // แดงอิฐ 30%
-  static const Color gold = Color(0xFFCC9A2B); // ทอง 10%
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color(0xFF7A2E22);
+  static const Color gold = Color(0xFFCC9A2B);
   static const Color card = Color(0xFFFFFFFF);
   static const Color text = Color(0xFF2E2E2E);
   static const Color muted = Color(0xFF8E8E93);
@@ -20,120 +29,253 @@ class QColors {
   static const Color disabled = Color(0xFFB0B3B8);
 }
 
-/// ===== MODEL จำลองข้อมูล =====
-class OrderItem {
-  final String orderNo;
-  final String roomText;
-  final String timeText;
-  OrderItem({
-    required this.orderNo,
-    required this.roomText,
-    required this.timeText,
+class BookingItem {
+  final int id;            // booking_history.id
+  final String userName;   // u.username
+  final String room;       // "Room 101" ...
+  final String time;       // "8:00 AM - 10:00 AM"
+  final String imagePath;  // ชื่อไฟล์รูปจาก DB เช่น "Meeting-RoomA.jpg"
+
+  BookingItem({
+    required this.id,
+    required this.userName,
+    required this.room,
+    required this.time,
+    required this.imagePath,
   });
+
+  factory BookingItem.fromStaffHistory(Map<String, dynamic> j) {
+    return BookingItem(
+      id: j['id'] as int,
+      userName: (j['name'] ?? '').toString(),
+      room: (j['room'] ?? '').toString(),
+      time: (j['time'] ?? '').toString(),
+      imagePath: (j['image'] ?? '').toString(),   // ✅ มาจาก API ที่เราเพิ่งเพิ่ม
+    );
+  }
 }
 
 /// ====== HOME (Approver) ======
 class HomeApprover extends StatefulWidget {
-  const HomeApprover({super.key});
+  final String? username; // จะรับจากหน้า login ได้
+  const HomeApprover({super.key, this.username});
 
   @override
   State<HomeApprover> createState() => _HomeApproverState();
 }
 
 class _HomeApproverState extends State<HomeApprover> {
-  // สมมุติข้อมูลตัวอย่าง
-  final List<OrderItem> _orders = [
-    OrderItem(
-      orderNo: 'ORDER0001',
-      roomText: 'จองห้อง ที่10',
-      timeText: 'เวลา : 12.00',
-    ),
-    OrderItem(
-      orderNo: 'ORDER0002',
-      roomText: 'จองห้อง ที่10',
-      timeText: 'เวลา : 12.00',
-    ),
-    OrderItem(
-      orderNo: 'ORDER0003',
-      roomText: 'จองห้อง ที่12',
-      timeText: 'เวลา : 14.30',
-    ),
-  ];
+  // ======= STATE จาก DB =======
+  bool _loading = true;
+  String? _error;
+
+  // โปรไฟล์จาก /api/profile/:username
+  String _displayName = '';
+  String _displayEmail = '';
+  String _displayRole = 'Approver';
+
+  // สถิติห้องจาก /api/staff/dashboard
+  int _countFree = 0;     // Enable
+  int _countPending = 0;  // Pending
+  int _countReserved = 0; // Reserved
+  int _countDisabled = 0; // Disable
+
+  // รายการคำขอ (Pending) สำหรับลิสต์ด้านล่าง (ดึงจริง)
+  final List<BookingItem> _orders = [];
 
   int _currentIndex = 0;
 
-  // ตัวอย่างข้อความ (mock)
-  final List<_Msg> _messages = [
-    _Msg(
-      title: 'คำขอจองใหม่',
-      body: 'ORDER0005 ห้อง A102 เวลา 09:00-11:00',
-      time: '10:21',
-    ),
-    _Msg(
-      title: 'แจ้งเตือนระบบ',
-      body: 'มีคำขอค้างอนุมัติ 2 รายการ',
-      time: '09:55',
-    ),
-    _Msg(
-      title: 'สถานะคำขอ',
-      body: 'ORDER0003 ผู้จองยกเลิกแล้ว',
-      time: 'เมื่อวาน',
-    ),
-    _Msg(
-      title: 'แจ้งปิดห้อง',
-      body: 'ห้อง C310 ปิดซ่อม 2 ชม.',
-      time: 'เมื่อวาน',
-    ),
-  ];
+  // mock กล่องข้อความเดิมไว้เหมือนเดิม
+final List<_Msg> _messages = [];
 
-  void _openInbox() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.6,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          builder: (_, controller) {
-            return Column(
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 42,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.black12,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'ข้อความ',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Expanded(
-                  child: ListView.separated(
-                    controller: controller,
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    itemCount: _messages.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _MessageTile(msg: _messages[i]),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
   }
+
+ Future<void> _loadAll() async {
+  setState(() {
+    _loading = true;
+    _error = null;
+  });
+
+  try {
+    final username = await _resolveUsername();
+    await _fetchProfile(username);
+    await _fetchDashboard();
+    await _fetchPendingOrders();      // ← เรียกแค่ครั้งเดียวพอ
+    await _fetchNotificationMsgs();   // ← โหลดข้อความแจ้งเตือนจริง
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    if (mounted) setState(() => _loading = false);
+  }
+}
+
+
+
+
+  /// หา username: รับจาก widget หรืออ่านจาก SharedPreferences('username')
+  Future<String> _resolveUsername() async {
+    if (widget.username != null && widget.username!.trim().isNotEmpty) {
+      return widget.username!;
+    }
+    final sp = await SharedPreferences.getInstance();
+    final u = sp.getString('username');
+    if (u == null || u.trim().isEmpty) {
+      return 'admin';
+    }
+    return u;
+  }
+
+  Future<void> _fetchProfile(String username) async {
+    final uri = Uri.parse('$kBaseUrl/api/profile/$username');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('โหลดโปรไฟล์ไม่สำเร็จ (${res.statusCode})');
+    }
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    _displayName = (data['username'] ?? '').toString();
+    _displayEmail = (data['user_email'] ?? '').toString();
+    _displayRole = (data['role_name'] ?? 'Approver').toString();
+  }
+
+  Future<void> _fetchDashboard() async {
+    final uri = Uri.parse('$kBaseUrl/api/staff/dashboard');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('โหลดข้อมูลสถิติห้องไม่สำเร็จ (${res.statusCode})');
+    }
+    final data = (json.decode(res.body) as Map<String, dynamic>);
+    _countFree = int.tryParse('${data['enable_count'] ?? 0}') ?? 0;
+    _countPending = int.tryParse('${data['pending_count'] ?? 0}') ?? 0;
+    _countReserved = int.tryParse('${data['reserved_count'] ?? 0}') ?? 0;
+    _countDisabled = int.tryParse('${data['disabled_count'] ?? 0}') ?? 0;
+  }
+
+  /// ดึงคำขอทั้งหมด แล้วกรอง Pending (สถานะ 'Pending')
+  Future<void> _fetchPendingOrders() async {
+    final uri = Uri.parse('$kBaseUrl/api/staff/history');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('โหลดรายการคำขอไม่สำเร็จ (${res.statusCode})');
+    }
+    final List data = json.decode(res.body) as List;
+    final pending = data.where((e) => (e['status'] ?? '') == 'Pending');
+    final list = pending
+        .map((e) => BookingItem.fromStaffHistory(e as Map<String, dynamic>))
+        .toList();
+
+    _orders
+      ..clear()
+      ..addAll(list);
+  }
+Future<void> _fetchNotificationMsgs() async {
+  final uri = Uri.parse('$kBaseUrl/api/staff/history');
+  final res = await http.get(uri);
+
+  if (res.statusCode != 200) {
+    throw Exception('โหลดข้อความแจ้งเตือนไม่สำเร็จ (${res.statusCode})');
+  }
+
+  final List data = json.decode(res.body) as List;
+
+  // เอาเฉพาะคำขอที่สถานะ Pending
+  final pendingList = data.where((e) => (e['status'] ?? '') == 'Pending');
+
+  final msgs = pendingList.map<_Msg>((e) {
+    final id = e['id'];
+    final room = (e['room'] ?? '').toString();      // เช่น Room 102
+    final timeRange = (e['time'] ?? '').toString(); // เช่น 1:00 PM - 3:00 PM
+
+    // ===== ดึงเวลาจาก room_date =====
+    final dateStr = (e['room_date'] ?? '').toString();
+    String displayTime = '-';
+
+    // พยายาม parse เป็น DateTime ก่อน (รองรับทั้ง "2025-11-21 18:59:12" และ "2025-11-21T18:59:12Z")
+    final dt = DateTime.tryParse(dateStr);
+    if (dt != null) {
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      displayTime = '$hh:$mm';
+    } else if (dateStr.length >= 16) {
+      // แผนเผื่อ: ถ้า parse ไม่ผ่าน แต่ string ยาวพอ ให้ตัดเอา index 11-16
+      displayTime = dateStr.substring(11, 16);
+    }
+
+    final orderNo = id is int
+        ? 'ORDER${id.toString().padLeft(4, '0')}'
+        : 'ORDER$id';
+
+    return _Msg(
+      title: 'คำขอจองใหม่',
+      body: '$orderNo $room $timeRange',
+      time: displayTime,     // << เวลาแสดงตรงนี้
+    );
+  }).toList();
+
+  _messages
+    ..clear()
+    ..addAll(msgs);
+}
+
+
+void _openInbox() {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, controller) {
+          return Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'ข้อความแจ้งเตือน',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+
+              // ✅ ถ้าไม่มีคำขอใหม่ ให้แสดงข้อความแจ้ง
+              Expanded(
+                child: _messages.isEmpty
+                    ? const Center(
+                        child: Text('ยังไม่มีคำขอจองใหม่'),
+                      )
+                    : ListView.separated(
+                        controller: controller,
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                        itemCount: _messages.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) => _MessageTile(msg: _messages[i]),
+                      ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -141,35 +283,59 @@ class _HomeApproverState extends State<HomeApprover> {
     return Scaffold(
       backgroundColor: QColors.bg,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: SizedBox(height: topInset * 0.1)),
-            SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: const SizedBox(height: 12)),
-            SliverToBoxAdapter(child: _buildStatsGrid()),
-            SliverToBoxAdapter(child: const SizedBox(height: 12)),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              sliver: SliverList.separated(
-                itemCount: _orders.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (ctx, i) => OrderCard(
-                  item: _orders[i],
-                  onGo: () {
-                    // ✅ กด GO แล้วพาไปหน้า ApprovePage
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ApprovePage()),
-                    );
-                  },
+        child: RefreshIndicator(
+          onRefresh: _loadAll,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: SizedBox(height: topInset * 0.1)),
+              SliverToBoxAdapter(child: _buildHeader()),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              if (_loading)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                )
+              else if (_error != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Text('เกิดข้อผิดพลาด: $_error'),
+                        const SizedBox(height: 8),
+                        OutlinedButton(onPressed: _loadAll, child: const Text('ลองอีกครั้ง')),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                SliverToBoxAdapter(child: _buildStatsGrid()),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  sliver: SliverList.separated(
+                    itemCount: _orders.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, i) => OrderCard(
+                      item: _orders[i],
+                      onGo: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ApproveDetailPage(item: _orders[i]),
+                          ),
+                        ).then((_) => _loadAll()); // กลับมาแล้วรีเฟรช
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ),
-
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 88),
-            ), // เว้นให้ Bottom bar
-          ],
+                const SliverToBoxAdapter(child: SizedBox(height: 88)),
+              ],
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomBar(),
@@ -184,7 +350,6 @@ class _HomeApproverState extends State<HomeApprover> {
         children: [
           Row(
             children: [
-              // โลโก้ชื่อแอป
               Text.rich(
                 TextSpan(
                   children: [
@@ -210,7 +375,6 @@ class _HomeApproverState extends State<HomeApprover> {
                 ),
               ),
               const Spacer(),
-              // ปุ่ม Logout วงกลม
               _logoutButton(),
             ],
           ),
@@ -218,7 +382,7 @@ class _HomeApproverState extends State<HomeApprover> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // การ์ดโปรไฟล์สั้น ๆ
+              // การ์ดโปรไฟล์ (โชว์ข้อมูลจาก DB)
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(10),
@@ -226,31 +390,23 @@ class _HomeApproverState extends State<HomeApprover> {
                     color: QColors.card,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x12000000),
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
+                      BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
                     ],
                   ),
                   child: Row(
                     children: [
                       const CircleAvatar(
                         radius: 22,
-                        // ใช้ไฟล์ png ที่มีในโปรเจกต์
-                        backgroundImage: AssetImage(
-                          'assets/images/avatar_placeholder.png',
-                        ),
+                        backgroundImage: AssetImage('assets/images/avatar_placeholder.png'),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            _MiniText('Mr.Chayut Samanupawin', bold: true),
-                            _MiniText.rich('Status : ', 'Normal'),
-                            _MiniText('ID : 00001'),
-                            _MiniText('Position : Approver'),
+                          children: [
+                            _MiniText(_displayName.isEmpty ? '-' : _displayName, bold: true),
+                            _MiniText.rich('Email : ', _displayEmail.isEmpty ? '-' : _displayEmail),
+                            _MiniText.rich('Role : ', _displayRole),
                           ],
                         ),
                       ),
@@ -270,25 +426,19 @@ class _HomeApproverState extends State<HomeApprover> {
                       color: QColors.card,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x12000000),
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
+                        BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
                       ],
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.mail_outline),
                       color: QColors.primaryRed,
-                      onPressed: _openInbox, // <- เรียกฟังก์ชันเปิด POP-UP
+                      onPressed: _openInbox,
                     ),
                   ),
                   Positioned(
                     right: -6,
                     top: -6,
-                    child: _badge(
-                      '${_messages.length > 99 ? '99+' : _messages.length}',
-                    ),
+                    child: _badge('${_messages.length > 99 ? '99+' : _messages.length}'),
                   ),
                 ],
               ),
@@ -299,7 +449,7 @@ class _HomeApproverState extends State<HomeApprover> {
     );
   }
 
-  /// กล่องสถิติ 2 แถว 2 คอลัมน์
+  /// กล่องสถิติ 2x2 (ใช้ค่าจริงจาก /api/staff/dashboard)
   Widget _buildStatsGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -309,60 +459,88 @@ class _HomeApproverState extends State<HomeApprover> {
         children: [
           StatTile(
             title: 'Free',
-            value: '6',
+            value: '$_countFree',
             color: QColors.free,
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const StatusRoomPage(status: 'Free'),
-                ),
+                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Free')),
               );
             },
           ),
           StatTile(
             title: 'Pending',
-            value: '2',
+            value: '$_countPending',
             color: QColors.pending,
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const StatusRoomPage(status: 'Pending'),
-                ),
+                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Pending')),
               );
             },
           ),
           StatTile(
             title: 'Reserved',
-            value: '1',
+            value: '$_countReserved',
             color: QColors.reserved,
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const StatusRoomPage(status: 'Reserved'),
-                ),
+                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Reserved')),
               );
             },
           ),
           StatTile(
             title: 'Disabled',
-            value: '1',
+            value: '$_countDisabled',
             color: QColors.disabled,
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const StatusRoomPage(status: 'Disabled'),
-                ),
+                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Disabled')),
               );
             },
           ),
+          Align(
+  alignment: Alignment.centerRight,
+  child: Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: SizedBox(
+      width: double.infinity, // ✅ เพิ่มความยาวปุ่ม (ปรับตัวเลขได้ตามใจเลย)
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,      // ✅ พื้นหลังปุ่มสีขาว
+          foregroundColor: Colors.black87,    // ✅ ตัวอักษร + ไอคอนสีดำ
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+              width: 1.2,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          elevation: 0,
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RoomBrowserPage()),
+          );
+        },
+        icon: const Icon(Icons.meeting_room_outlined),
+        label: const Text('Browse Rooms'),
+      ),
+    ),
+  ),
+)
+
         ],
       ),
     );
   }
+  
 
   /// Bottom Navigation (Main / Approver / History / Profile)
   Widget _buildBottomBar() {
@@ -378,11 +556,7 @@ class _HomeApproverState extends State<HomeApprover> {
         color: QColors.primaryRed,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
+          BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -2)),
         ],
       ),
       child: SafeArea(
@@ -395,31 +569,19 @@ class _HomeApproverState extends State<HomeApprover> {
                 borderRadius: BorderRadius.circular(16),
                 onTap: () {
                   setState(() => _currentIndex = i);
-
                   switch (i) {
                     case 0:
-                      // หน้า Home
-                      break;
+                      break; // หน้า Home
                     case 1:
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ApprovePage()),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ApprovePage()));
                       break;
                     case 2:
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const HistoryPage(),
-                        ),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()));
                       break;
                     case 3:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileApproverPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
                       );
                       break;
                   }
@@ -429,20 +591,14 @@ class _HomeApproverState extends State<HomeApprover> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        items[i].icon,
-                        size: 22,
-                        color: active ? QColors.gold : Colors.white,
-                      ),
+                      Icon(items[i].icon, size: 22, color: active ? QColors.gold : Colors.white),
                       const SizedBox(height: 4),
                       Text(
                         items[i].label,
                         style: TextStyle(
                           color: active ? QColors.gold : Colors.white,
                           fontSize: 12.5,
-                          fontWeight: active
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                           letterSpacing: 0.2,
                         ),
                       ),
@@ -463,13 +619,7 @@ class _HomeApproverState extends State<HomeApprover> {
       decoration: const ShapeDecoration(
         color: QColors.card,
         shape: CircleBorder(),
-        shadows: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        shadows: [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 3))],
       ),
       child: IconButton(
         icon: const Icon(Icons.logout_rounded),
@@ -487,16 +637,10 @@ class _HomeApproverState extends State<HomeApprover> {
         title: const Text('Logout'),
         content: const Text('ต้องการออกจากระบบหรือไม่?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: QColors.primaryRed,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: QColors.primaryRed, foregroundColor: Colors.white),
             child: const Text('ออกจากระบบ'),
           ),
         ],
@@ -504,9 +648,10 @@ class _HomeApproverState extends State<HomeApprover> {
     );
 
     if (ok == true) {
-      // TODO: เคลียร์ token/session ถ้ามี
+      final sp = await SharedPreferences.getInstance();
+      await sp.remove('username');
+
       if (!mounted) return;
-      // พาไปหน้า Login และล้าง back stack
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginPage()),
         (route) => false,
@@ -524,23 +669,18 @@ class _HomeApproverState extends State<HomeApprover> {
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-        ),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
       ),
     );
   }
 }
 
-/// การ์ดแสดงสถิติห้อง
-/// การ์ดแสดงสถิติห้อง (กดได้)
+/// การ์ดสถิติ (กดได้)
 class StatTile extends StatelessWidget {
   final String title;
   final String value;
   final Color color;
-  final VoidCallback? onTap; // <-- เพิ่ม
+  final VoidCallback? onTap;
 
   const StatTile({
     super.key,
@@ -554,9 +694,9 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final w = (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2;
     return SizedBox(
-      width: w, // 2 คอลัมน์
+      width: w,
       child: InkWell(
-        onTap: onTap, // <-- กดแล้วเรียก onTap
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -564,11 +704,7 @@ class StatTile extends StatelessWidget {
             color: QColors.card,
             borderRadius: BorderRadius.circular(14),
             boxShadow: const [
-              BoxShadow(
-                color: Color(0x12000000),
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
+              BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
             ],
           ),
           child: Row(
@@ -576,11 +712,7 @@ class StatTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 16),
                 ),
               ),
               const SizedBox(width: 6),
@@ -588,18 +720,8 @@ class StatTile extends StatelessWidget {
                 width: 34,
                 height: 34,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
+                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 16)),
               ),
             ],
           ),
@@ -609,9 +731,9 @@ class StatTile extends StatelessWidget {
   }
 }
 
-/// การ์ดรายการคำสั่งจอง
+/// การ์ดรายการคำสั่งจอง (แสดงเฉพาะ 4 ฟิลด์ที่ต้องการ)
 class OrderCard extends StatelessWidget {
-  final OrderItem item;
+  final BookingItem item;
   final VoidCallback onGo;
   const OrderCard({super.key, required this.item, required this.onGo});
 
@@ -621,62 +743,39 @@ class OrderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.card,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 12,
-            offset: Offset(0, 5),
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, 5))],
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Order number
             Text(
-              'Order Number : ${item.orderNo}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: QColors.text,
-              ),
+              'Order Number : #${item.id}',
+              style: const TextStyle(fontWeight: FontWeight.w700, color: QColors.text),
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.roomText,
-                    style: const TextStyle(color: QColors.text),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  item.timeText,
-                  style: const TextStyle(color: QColors.text),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            // ห้อง
+            Text('ห้อง : ${item.room}', style: const TextStyle(color: QColors.text)),
+            const SizedBox(height: 4),
+            // เวลา
+            Text('เวลา : ${item.time}', style: const TextStyle(color: QColors.text)),
+            const SizedBox(height: 4),
+            // ชื่อ User
+            Text('ผู้ขอ : ${item.userName}', style: const TextStyle(color: QColors.text)),
             const SizedBox(height: 12),
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: QColors.primaryRed,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 10,
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
                   elevation: 0,
                 ),
                 onPressed: onGo,
-                child: const Text(
-                  'Go',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+                child: const Text('Go', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -693,8 +792,8 @@ class _MiniText extends StatelessWidget {
   const _MiniText(this.text, {this.bold = false});
 
   const _MiniText.rich(String lead, String tail, {Color? color2})
-    : text = '$lead$tail',
-      bold = false;
+      : text = '$lead$tail',
+        bold = false;
 
   @override
   Widget build(BuildContext context) {
@@ -734,13 +833,7 @@ class _MessageTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x11000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 3))],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,11 +853,8 @@ class _MessageTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      msg.time,
-                      style: const TextStyle(
-                        color: QColors.muted,
-                        fontSize: 12,
-                      ),
+                      msg.time,  // 👈 ตอนนี้น่าจะแสดงเช่น "18:59"
+                      style: const TextStyle(color: QColors.muted, fontSize: 12),
                     ),
                   ],
                 ),

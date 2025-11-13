@@ -1,8 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import 'package:project2/view/approver/history_approver.dart';
 import 'package:project2/view/approver/home.dart';
 import 'package:project2/view/approver/proflie.dart';
 import 'package:project2/view/login.dart';
+
+/// ===== Backend base URL =====
+/// ใส่ IP/Port ให้ตรงกับเครื่องที่รัน Node.js
+const String kBaseUrl = "http://192.168.1.123:3000";
 
 /// ===== Colors =====
 class AColors {
@@ -13,12 +20,34 @@ class AColors {
   static const text = Color(0xFF2E2E2E);
 }
 
-/// ===== Model =====
+/// ===== Model (จาก DB จริง) =====
 class ApproveItem {
-  final int id;
-  final String room;
-  final String time;
-  ApproveItem({required this.id, required this.room, required this.time});
+  final int id;           // booking_history.id
+  final String userName;  // ผู้ขอจอง (u.username)
+  final String room;      // "Room 101" ฯลฯ
+  final String date;      // เช่น "1 Nov 2025"
+  final String time;      // "8:00 AM - 10:00 AM"
+  final String reason;    // เหตุผล
+
+  ApproveItem({
+    required this.id,
+    required this.userName,
+    required this.room,
+    required this.date,
+    required this.time,
+    required this.reason,
+  });
+
+  factory ApproveItem.fromHistoryJson(Map<String, dynamic> j) {
+    return ApproveItem(
+      id: j['id'] as int,
+      userName: (j['name'] ?? '').toString(),
+      room: (j['room'] ?? '').toString(),
+      date: (j['date'] ?? '').toString(),
+      time: (j['time'] ?? '').toString(),
+      reason: (j['reason'] ?? '').toString(),
+    );
+  }
 }
 
 class ApprovePage extends StatefulWidget {
@@ -29,6 +58,7 @@ class ApprovePage extends StatefulWidget {
 
 class _ApprovePageState extends State<ApprovePage> {
   bool _loading = true;
+  String? _error;
   final List<ApproveItem> _items = [];
   final Set<int> _busyIds = {}; // ป้องกันกดซ้ำต่อรายการ
   int _currentIndex = 1;
@@ -39,52 +69,84 @@ class _ApprovePageState extends State<ApprovePage> {
     _loadPending();
   }
 
-  /// โหลด mock data (ไม่เรียก API)
+  /// ดึง "คำขอค้างอนุมัติ" จาก DB
   Future<void> _loadPending() async {
-    setState(() => _loading = true);
-    await Future<void>.delayed(
-      const Duration(milliseconds: 400),
-    ); // เอฟเฟกต์โหลดนิดหน่อย
-    final mock = List.generate(
-      8,
-      (i) => ApproveItem(
-        id: 1001 + i,
-        room: 'R-${(i % 4) + 1}0${(i % 3) + 1}',
-        time:
-            '10:${(i * 7 % 60).toString().padLeft(2, '0')} - 11:${((i * 7 + 45) % 60).toString().padLeft(2, '0')}',
-      ),
-    );
-    _items
-      ..clear()
-      ..addAll(mock);
-    if (mounted) setState(() => _loading = false);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final uri = Uri.parse('$kBaseUrl/api/staff/history');
+      final res = await http.get(uri);
+      if (res.statusCode != 200) {
+        throw Exception('โหลดไม่สำเร็จ (${res.statusCode})');
+      }
+      final List data = json.decode(res.body) as List;
+
+      // staff/history คืนรายการทั้งหมด → กรองเอา Pending
+      final pending = data.where((e) => (e['status'] ?? '') == 'Pending');
+      final mapped = pending
+          .map((e) => ApproveItem.fromHistoryJson(e as Map<String, dynamic>))
+          .toList();
+
+      _items
+        ..clear()
+        ..addAll(mapped);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  /// "ส่งผล" แบบ local: แค่ลบออก + แจ้งเตือน (ไม่เรียกเซิร์ฟเวอร์)
+  /// เรียกอนุมัติ/ปฏิเสธจริงไปที่ backend
   Future<void> _submitDecision(
     ApproveItem it,
     String status, {
-    String? reason,
+    String? reason, // ตอนนี้ backend ไม่รับ reason; เก็บไว้แสดง UI
   }) async {
     if (_busyIds.contains(it.id)) return;
     _busyIds.add(it.id);
     setState(() {});
 
+    // ลบแบบ optimistic
     final idx = _items.indexWhere((x) => x.id == it.id);
+    ApproveItem? removed;
     if (idx != -1) {
-      _items.removeAt(idx); // ลบแบบ optimistic
+      removed = _items.removeAt(idx);
       setState(() {});
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    _busyIds.remove(it.id);
-    if (!mounted) return;
+    // 2=approve, 3=reject
+    final String statusCode = status == 'approved' ? '2' : '3';
+    try {
+      final uri = Uri.parse('$kBaseUrl/api/approver/booking/${it.id}');
+      final res = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': statusCode}),
+      );
 
-    final msg = status == 'approved'
-        ? 'อนุมัติ ORDER${it.id.toString().padLeft(4, '0')} เรียบร้อย'
-        : 'ปฏิเสธ ORDER${it.id.toString().padLeft(4, '0')}${(reason != null && reason.trim().isNotEmpty) ? ' (เหตุผล: ${reason.trim()})' : ''}';
-    _showSnack(msg);
-    setState(() {});
+      if (res.statusCode != 200) {
+        // rollback ถ้า fail
+        if (removed != null) {
+          _items.insert(idx, removed);
+        }
+        throw Exception('อัปเดตไม่สำเร็จ (${res.statusCode})');
+      }
+
+      final msg = status == 'approved'
+          ? 'อนุมัติคำขอ #${it.id} เรียบร้อย'
+          : 'ปฏิเสธคำขอ #${it.id}'
+              '${(reason != null && reason.trim().isNotEmpty) ? ' (เหตุผล: ${reason.trim()})' : ''}';
+      _showSnack(msg);
+    } catch (e) {
+      _showSnack('ผิดพลาด: $e');
+    } finally {
+      _busyIds.remove(it.id);
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _confirmLogout() async {
@@ -123,9 +185,8 @@ class _ApprovePageState extends State<ApprovePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ยืนยันการอนุมัติ'),
-        content: Text(
-          'ต้องการอนุมัติ ORDER${it.id.toString().padLeft(4, '0')} ใช่ไหม?',
-        ),
+        content: Text('ต้องการอนุมัติคำขอ #${it.id} ใช่ไหม?\n'
+            'ห้อง: ${it.room}\nเวลา: ${it.time}\nผู้ขอ: ${it.userName}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -145,7 +206,7 @@ class _ApprovePageState extends State<ApprovePage> {
     if (ok == true) await _submitDecision(it, 'approved');
   }
 
-  /// ขอเหตุผลการปฏิเสธ แล้วค่อย "บันทึก" แบบ local
+  /// ขอเหตุผลการปฏิเสธ → ส่ง backend เฉพาะ status (ตอนนี้ backend ยังไม่รับ reason)
   Future<void> _promptRejectReason(ApproveItem it) async {
     final ctl = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -228,7 +289,7 @@ class _ApprovePageState extends State<ApprovePage> {
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      'รายการคำขอ',
+                      'รายการคำขอ (Pending)',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -247,6 +308,22 @@ class _ApprovePageState extends State<ApprovePage> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 )
+              else if (_error != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Text('เกิดข้อผิดพลาด: $_error'),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: _loadPending,
+                          child: const Text('ลองอีกครั้ง'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else if (_items.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -257,22 +334,20 @@ class _ApprovePageState extends State<ApprovePage> {
                         const SizedBox(height: 8),
                         OutlinedButton(
                           onPressed: _loadPending,
-                          child: const Text('ลองโหลดอีกครั้ง'),
+                          child: const Text('รีโหลด'),
                         ),
                       ],
                     ),
                   ),
                 )
               else
-                // ใช้ SliverList ปกติ (SliverList.separated ไม่มีใน Flutter มาตรฐาน)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, i) {
-                      // แทรกช่องว่างคั่นรายการ
                       if (i.isOdd) return const SizedBox(height: 12);
-                      final index = i ~/ 2;
-                      final it = _items[index];
+                      final idx = i ~/ 2;
+                      final it = _items[idx];
                       return _ApproveCard(
                         item: it,
                         busy: _busyIds.contains(it.id),
@@ -383,17 +458,13 @@ class _ApprovePageState extends State<ApprovePage> {
                     case 2:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const HistoryPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const HistoryPage()),
                       );
                       break;
                     case 3:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileApproverPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
                       );
                       break;
                   }
@@ -414,9 +485,7 @@ class _ApprovePageState extends State<ApprovePage> {
                         style: TextStyle(
                           color: active ? AColors.gold : Colors.white,
                           fontSize: 12.5,
-                          fontWeight: active
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                           letterSpacing: 0.2,
                         ),
                       ),
@@ -432,7 +501,7 @@ class _ApprovePageState extends State<ApprovePage> {
   }
 }
 
-/// ===== Item Card =====
+/// ===== Card แสดงรายการอนุมัติ =====
 class _ApproveCard extends StatelessWidget {
   final ApproveItem item;
   final bool busy;
@@ -470,28 +539,25 @@ class _ApproveCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Order Number : ORDER${item.id.toString().padLeft(4, '0')}',
+                  'Order Number : #${item.id}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: AColors.text,
                   ),
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'จองห้อง ${item.room}',
-                        style: const TextStyle(color: AColors.text),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'เวลา : ${item.time}',
-                      style: const TextStyle(color: AColors.text),
-                    ),
-                  ],
-                ),
+                Text('ผู้ขอ : ${item.userName}', style: const TextStyle(color: AColors.text)),
+                const SizedBox(height: 2),
+                Text('ห้อง : ${item.room}', style: const TextStyle(color: AColors.text)),
+                const SizedBox(height: 2),
+                Text('วันที่ : ${item.date}', style: const TextStyle(color: AColors.text)),
+                const SizedBox(height: 2),
+                Text('เวลา : ${item.time}', style: const TextStyle(color: AColors.text)),
+                if (item.reason.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('เหตุผล : ${item.reason}',
+                      style: TextStyle(color: AColors.text.withOpacity(0.85))),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -507,10 +573,7 @@ class _ApproveCard extends StatelessWidget {
                           elevation: 0,
                         ),
                         onPressed: onApprove,
-                        child: const Text(
-                          'Yes',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        child: const Text('Yes', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -526,10 +589,7 @@ class _ApproveCard extends StatelessWidget {
                           elevation: 0,
                         ),
                         onPressed: onReject,
-                        child: const Text(
-                          'No',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        child: const Text('No', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
