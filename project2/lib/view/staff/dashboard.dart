@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
@@ -8,7 +9,7 @@ import 'package:project2/view/staff/history_staff.dart';
 import 'package:project2/view/staff/profile_staff.dart';
 
 class Dashboard extends StatefulWidget {
-  final String username; // 👈 เพิ่มตัวแปรรับ username
+  final String username; // 👈 รับ username จาก login
 
   const Dashboard({super.key, required this.username});
 
@@ -18,7 +19,7 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   // ---------------------------------------------------------------
-  // Variables for Dashboard data
+  // Dashboard data
   // ---------------------------------------------------------------
   int enableCount = 0;
   int pendingCount = 0;
@@ -27,12 +28,28 @@ class _DashboardState extends State<Dashboard> {
   bool isLoading = true;
 
   // ---------------------------------------------------------------
-  // Variables for Profile data
+  // Profile data
   // ---------------------------------------------------------------
   String profileName = '';
   String profileRole = '';
   String profileId = '';
   bool isProfileLoading = true;
+
+  // ✅ ใช้ baseUrl เดียวกับ AuthApi
+  final String baseUrl = AuthApi().baseUrl;
+
+  // ---------------------------------------------------------------
+  // ดึง token จาก SharedPreferences (ถ้ามี)
+  // ---------------------------------------------------------------
+  Future<Map<String, String>> _buildHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   // ---------------------------------------------------------------
   // Fetch Dashboard Data
@@ -43,8 +60,11 @@ class _DashboardState extends State<Dashboard> {
     });
 
     try {
+      final headers = await _buildHeaders();
+
       final response = await http.get(
-        Uri.parse("http://192.168.1.123:3000/api/staff/dashboard"),
+        Uri.parse("$baseUrl/api/staff/dashboard"),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -57,6 +77,7 @@ class _DashboardState extends State<Dashboard> {
           isLoading = false;
         });
       } else {
+        print("❌ Failed to load dashboard: ${response.statusCode}");
         setState(() {
           isLoading = false;
         });
@@ -74,11 +95,12 @@ class _DashboardState extends State<Dashboard> {
   // ---------------------------------------------------------------
   Future<void> _fetchProfileData() async {
     try {
-      // 👇 ใช้ widget.username แทน 'staff'
+      final headers = await _buildHeaders();
       final username = widget.username;
 
       final response = await http.get(
-        Uri.parse("http://192.168.1.112:3000/api/profile/$username"),
+        Uri.parse("$baseUrl/api/profile/$username"),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -90,7 +112,7 @@ class _DashboardState extends State<Dashboard> {
           isProfileLoading = false;
         });
       } else {
-        print(" Failed to load profile: ${response.statusCode}");
+        print("❌ Failed to load profile: ${response.statusCode}");
         setState(() => isProfileLoading = false);
       }
     } catch (e) {
@@ -112,13 +134,14 @@ class _DashboardState extends State<Dashboard> {
   void _onItemTapped(int index) {
     switch (index) {
       case 0:
+        // อยู่หน้า Main แล้ว ไม่ต้องทำอะไร
         break;
       case 1:
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => Browser(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
       case 2:
@@ -126,7 +149,7 @@ class _DashboardState extends State<Dashboard> {
           context,
           MaterialPageRoute(
             builder: (context) => HistoryStaff(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
       case 3:
@@ -134,7 +157,7 @@ class _DashboardState extends State<Dashboard> {
           context,
           MaterialPageRoute(
             builder: (context) => ProfileStaff(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
     }
@@ -160,7 +183,11 @@ class _DashboardState extends State<Dashboard> {
               backgroundColor: const Color(0xFF883C31),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
+              // ถ้าใช้ SharedPreferences เก็บ token/uid ก็ลบออกตรงนี้ได้
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Logged out successfully.')),
@@ -317,7 +344,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   // ---------------------------------------------------------------
-  // Profile Card
+  // Profile Card (แสดงเฉพาะ ID + Position)
   // ---------------------------------------------------------------
   Widget _buildProfileCard(BuildContext context) {
     if (isProfileLoading) {
@@ -347,25 +374,20 @@ class _DashboardState extends State<Dashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  profileName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF883C31),
-                  ),
-                ),
-                const SizedBox(height: 2),
+                // ✅ แสดง ID เท่านั้น
                 Text(
                   'ID: ${profileId.padLeft(5, '0')}',
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
+                const SizedBox(height: 2),
+                // ✅ แสดง Position จาก role_name
                 Text(
                   'Position: $profileRole',
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 11, color: Colors.black87),
                 ),
               ],
             ),

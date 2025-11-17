@@ -392,37 +392,133 @@ app.get("/api/user/history/:uid", (req, res) => {
 
 
 ////////////////////////////////////////////////// Staff from toon //////////////////////////////////////////////////
-
-// ==================== API dashborad staff =======================
+// ==================== API dashboard staff (เวอร์ชันตามเวลา + รีเซ็ตวันใหม่) =======================
 app.get("/api/staff/dashboard", (req, res) => {
-  const sql = `
-    SELECT 
-      SUM(CASE WHEN room_8AM = 1 THEN 1 ELSE 0 END +
-          CASE WHEN room_10AM = 1 THEN 1 ELSE 0 END +
-          CASE WHEN room_1PM = 1 THEN 1 ELSE 0 END +
-          CASE WHEN room_3PM = 1 THEN 1 ELSE 0 END) AS enable_count,
-      SUM(CASE WHEN room_8AM = 2 THEN 1 ELSE 0 END +
-          CASE WHEN room_10AM = 2 THEN 1 ELSE 0 END +
-          CASE WHEN room_1PM = 2 THEN 1 ELSE 0 END +
-          CASE WHEN room_3PM = 2 THEN 1 ELSE 0 END) AS pending_count,
-      SUM(CASE WHEN room_8AM = 3 THEN 1 ELSE 0 END +
-          CASE WHEN room_10AM = 3 THEN 1 ELSE 0 END +
-          CASE WHEN room_1PM = 3 THEN 1 ELSE 0 END +
-          CASE WHEN room_3PM = 3 THEN 1 ELSE 0 END) AS reserved_count,
-      SUM(CASE WHEN room_8AM = 4 THEN 1 ELSE 0 END +
-          CASE WHEN room_10AM = 4 THEN 1 ELSE 0 END +
-          CASE WHEN room_1PM = 4 THEN 1 ELSE 0 END +
-          CASE WHEN room_3PM = 4 THEN 1 ELSE 0 END) AS disabled_count
-    FROM booking;
+  const today = moment().format("YYYY-MM-DD");
+
+  // 1) รีเซ็ตวันใหม่:
+  //    - ถ้า room_date != วันนี้ → อัปเดต room_date = วันนี้
+  //    - slot ที่เป็น 1,2,3,5 ให้กลับเป็น 1 (Available)
+  //    - slot ที่เป็น 4 (Disabled โดย staff) ยังเป็น 4 เหมือนเดิม
+  const resetSql = `
+    UPDATE booking
+    SET 
+      room_date = ?,
+      room_8AM = CASE WHEN room_8AM IN (1,2,3,5) THEN 1 ELSE room_8AM END,
+      room_10AM = CASE WHEN room_10AM IN (1,2,3,5) THEN 1 ELSE room_10AM END,
+      room_1PM = CASE WHEN room_1PM IN (1,2,3,5) THEN 1 ELSE room_1PM END,
+      room_3PM = CASE WHEN room_3PM IN (1,2,3,5) THEN 1 ELSE room_3PM END
+    WHERE DATE(room_date) <> ?
   `;
-  con.query(sql, (err, result) => {
+
+  con.query(resetSql, [today, today], (err) => {
     if (err) {
-      console.error("DB error:", err);
-      return res.status(500).json({ message: "Database error" });
+      console.error("⚠️ Error reset day in dashboard:", err);
+      return res.status(500).json({ message: "Database error (reset day)" });
     }
-    res.json(result[0]); // ส่งผลลัพธ์กลับเป็น object เดียว
+
+    // 2) ทำให้ slot ที่ "หมดเวลา" กลายเป็น 5 (Expired) ตามเวลาปัจจุบัน
+    //    - หลัง 10:00 → หมดช่วง 8–10
+    //    - หลัง 12:00 → หมดช่วง 10–12
+    //    - หลัง 15:00 → หมดช่วง 13–15
+    //    - หลัง 17:00 → หมดช่วง 15–17
+    const expireSql = `
+      UPDATE booking
+      SET
+        room_8AM = IF(TIME(NOW()) >= '10:00:00' AND room_8AM NOT IN (4,5), 5, room_8AM),
+        room_10AM = IF(TIME(NOW()) >= '12:00:00' AND room_10AM NOT IN (4,5), 5, room_10AM),
+        room_1PM = IF(TIME(NOW()) >= '15:00:00' AND room_1PM NOT IN (4,5), 5, room_1PM),
+        room_3PM = IF(TIME(NOW()) >= '17:00:00' AND room_3PM NOT IN (4,5), 5, room_3PM)
+      WHERE DATE(room_date) = ?
+    `;
+
+    con.query(expireSql, [today], (err2) => {
+      if (err2) {
+        console.error("⚠️ Error expire slots in dashboard:", err2);
+        return res.status(500).json({ message: "Database error (expire slots)" });
+      }
+
+      // 3) ดึงค่าไปโชว์ใน Dashboard
+      const countSql = `
+        SELECT 
+          -- 1 = Available
+          SUM(
+            (room_8AM = 1) +
+            (room_10AM = 1) +
+            (room_1PM = 1) +
+            (room_3PM = 1)
+          ) AS enable_count,
+
+          -- 2 = Pending
+          SUM(
+            (room_8AM = 2) +
+            (room_10AM = 2) +
+            (room_1PM = 2) +
+            (room_3PM = 2)
+          ) AS pending_count,
+
+          -- 3 = Reserved
+          SUM(
+            (room_8AM = 3) +
+            (room_10AM = 3) +
+            (room_1PM = 3) +
+            (room_3PM = 3)
+          ) AS reserved_count,
+
+          -- 4 = Disabled (จริง ๆ) + 5 = Expired (หมดเวลา)
+          SUM(
+            (room_8AM IN (4,5)) +
+            (room_10AM IN (4,5)) +
+            (room_1PM IN (4,5)) +
+            (room_3PM IN (4,5))
+          ) AS disabled_count
+        FROM booking
+        WHERE DATE(room_date) = ?
+      `;
+
+      con.query(countSql, [today], (err3, result) => {
+        if (err3) {
+          console.error("DB error (count dashboard):", err3);
+          return res
+            .status(500)
+            .json({ message: "Database error (count dashboard)" });
+        }
+        res.json(result[0]);
+      });
+    });
   });
 });
+// ✅ PROFILE BY USER ID (ใช้สำหรับ Staff Dashboard)
+app.get("/api/profile/by-id/:uid", (req, res) => {
+  const uid = req.params.uid;
+
+  const sql = `
+    SELECT 
+      u.id AS user_id,
+      CASE 
+        WHEN u.role = 1 THEN 'Approver'
+        WHEN u.role = 2 THEN 'Staff'
+        WHEN u.role = 3 THEN 'User'
+        ELSE 'Unknown'
+      END AS role_name
+    FROM user AS u
+    WHERE u.id = ?
+  `;
+
+  con.query(sql, [uid], (err, results) => {
+    if (err) {
+      console.error("DB error /api/profile/by-id:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(results[0]);   // { user_id: 2, role_name: "Staff" }
+  });
+});
+
 
 // ==================== API Get Data Room for staff ===================== //
 app.get("/api/staff/rooms", (req, res) => {
