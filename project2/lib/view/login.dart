@@ -3,7 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'register.dart';
 
-// ✅ import หน้าของแต่ละ Role
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 import 'package:project2/view/staff/dashboard.dart';
 import 'package:project2/view/user/booking_room.dart';
 import 'package:project2/view/approver/home.dart';
@@ -378,9 +381,27 @@ class AppColors {
   static const gold = Color(0xFFFFC107);
 }
 
-// ====== API เชื่อมกับ Node.js ======
+// ====== API เชื่อมกับ Node.js + เก็บ session ======
 class AuthApi {
+  // ✅ ให้ใช้ IP เดียวกับ HistoryPage
   final String baseUrl = "http://192.168.1.123:3000";
+
+  // ✅ ตัวแปร static ให้หน้าอื่นอ้างอิงได้
+  static int? userId;
+  static String? username;
+  static String? role;
+  static String? token;
+
+  /// ✅ ใช้เวลาจะยิง API ที่ต้องส่ง token
+  Map<String, String> get authHeaders {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
 
   Future<String> login({
     required String username,
@@ -396,6 +417,27 @@ class AuthApi {
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);
+
+      // 📝 สมมติ backend ส่งกลับมาแบบนี้:
+      // { message, id, role, username, email, token? }
+
+      // ✅ เก็บค่าไว้ใน static
+      userId = data['id'];
+      role = data['role'];
+      AuthApi.username = data['username'] ?? username;
+      token = data['token']; // ถ้า backend ยังไม่มี token ตรงนี้จะเป็น null เฉย ๆ ไม่พัง
+
+      // ✅ เก็บลง SharedPreferences ให้หน้าอื่นดึงใช้ได้
+      final prefs = await SharedPreferences.getInstance();
+      if (userId != null) await prefs.setInt('uid', userId!);
+      if (role != null) await prefs.setString('role', role!);
+      if (AuthApi.username != null) {
+        await prefs.setString('username', AuthApi.username!);
+      }
+      if (token != null) {
+        await prefs.setString('token', token!);
+      }
+
       return data['role'];
     } else {
       throw Exception("Invalid credentials or server error");

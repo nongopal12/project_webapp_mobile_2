@@ -159,12 +159,12 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _infoRow(Icons.location_on,
-              'Room: ${booking['room_number']} (Floor ${booking['room_location']})'),
+              'Room: ${booking['room_number']} (Floor ${booking['room_location']})'),const SizedBox(height: 8),
           _infoRow(Icons.calendar_today,
-              'Date: ${booking['room_date'].toString().replaceAll("T", " ").replaceAll("Z", "")}'),
-          _infoRow(Icons.access_time, 'Time: ${_timeSlot(booking['room_time'])}'),
+              'Date: ${booking['room_date'].toString().replaceAll("T", " ").replaceAll("Z", "")}'),const SizedBox(height: 8),
+          _infoRow(Icons.access_time, 'Time: ${_timeSlot(booking['room_time'])}'),const SizedBox(height: 8),
           _infoRow(Icons.notes, 'Reason: ${booking['reason']}'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 8),

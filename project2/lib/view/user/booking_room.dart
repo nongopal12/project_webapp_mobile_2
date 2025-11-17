@@ -46,21 +46,24 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  // Convert DB value (1–4) into readable text
-  String statusText(int value) {
-    switch (value) {
-      case 1:
-        return "Available";
-      case 2:
-        return "Pending";
-      case 3:
-        return "Reserved";
-      case 4:
-        return "Disable";
-      default:
-        return "Unknown";
-    }
+String statusText(int value) {
+  switch (value) {
+    case 1:
+      return "Available";
+    case 2:
+      return "Pending";
+    case 3:
+      return "Reserved";
+    case 4:
+      return "Disable";        
+    case 5:
+      return "Not Available";  
+    default:
+      return "Unknown";
   }
+}
+
+
 
   Color getStatusColor(String status) {
     switch (status) {

@@ -150,30 +150,64 @@ app.post("/api/login", (req, res) => {
 });
 
 ////////////////////////////////////////////////// USER from BOOK //////////////////////////////////////////////////
-
-// ================== GET all available rooms ==================
+// ================== GET all rooms (reset by day + auto close by time) ==================
 app.get("/api/rooms", (req, res) => {
   const today = moment().format("YYYY-MM-DD");
 
-  // First, make sure all rooms have today's date
-  con.query(
-    "UPDATE booking SET room_date = ? WHERE DATE(room_date) != ?",
-    [today, today],
-    (err) => {
-      if (err) console.error("⚠️ Error updating room dates:", err);
+  // STEP 1: ถ้าเปลี่ยนวัน -> รีเซ็ตทุกห้องให้เป็น Free ยกเว้น Disabled (4)
+  const resetSql = `
+    UPDATE booking
+    SET
+      room_date = ?,
+      room_8AM  = CASE WHEN room_8AM  = 4 THEN 4 ELSE 1 END,
+      room_10AM = CASE WHEN room_10AM = 4 THEN 4 ELSE 1 END,
+      room_1PM  = CASE WHEN room_1PM  = 4 THEN 4 ELSE 1 END,
+      room_3PM  = CASE WHEN room_3PM  = 4 THEN 4 ELSE 1 END
+    WHERE DATE(room_date) != ? OR room_date IS NULL;
+  `;
 
-      // Then fetch today's rooms
-      const sql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
-      con.query(sql, [today], (err2, results) => {
-        if (err2) {
-          console.error("❌ Error fetching rooms:", err2);
+  con.query(resetSql, [today, today], (errReset) => {
+    if (errReset) {
+      console.error("⚠️ Error resetting rooms for new day:", errReset);
+      // ยังไปต่อได้
+    }
+
+    // STEP 2: Auto-close slot ตามเวลา (ใช้ค่า 5 = หมดเวลาจองแล้ว)
+    const autoCloseSql = `
+      UPDATE booking
+      SET
+        -- 8.00 - 10.00 หมดเมื่อ >= 10:00
+        room_8AM  = IF(TIME(NOW()) >= '10:00:00' AND room_8AM  = 1, 5, room_8AM),
+
+        -- 10.00 - 12.00 หมดเมื่อ >= 12:00
+        room_10AM = IF(TIME(NOW()) >= '12:00:00' AND room_10AM = 1, 5, room_10AM),
+
+        -- 13.00 - 15.00 หมดเมื่อ >= 15:00
+        room_1PM  = IF(TIME(NOW()) >= '15:00:00' AND room_1PM  = 1, 5, room_1PM),
+
+        -- 15.00 - 17.00 หมดเมื่อ >= 17:00
+        room_3PM  = IF(TIME(NOW()) >= '17:00:00' AND room_3PM  = 1, 5, room_3PM)
+      WHERE DATE(room_date) = CURDATE();
+    `;
+
+    con.query(autoCloseSql, (errAuto) => {
+      if (errAuto) {
+        console.error("⚠️ Error auto closing slots:", errAuto);
+      }
+
+      // STEP 3: ดึงข้อมูลห้องหลังจากอัปเดตแล้วส่งให้ Flutter
+      const selectSql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
+      con.query(selectSql, [today], (errSelect, results) => {
+        if (errSelect) {
+          console.error("❌ Error fetching rooms:", errSelect);
           return res.status(500).json({ message: "Database error" });
         }
         res.json(results);
       });
-    }
-  );
+    });
+  });
 });
+
 
 // ================== POST book a room ==================
 app.post("/api/book", (req, res) => {
@@ -248,9 +282,11 @@ app.post("/api/book", (req, res) => {
 
             // 🧠 Step 4: Record booking history
             const insertSql = `
-              INSERT INTO booking_history (user_id, room_number, room_date, room_time, reason, status)
-              VALUES (?, ?, NOW(), ?, ?, '1')
-            `;
+              INSERT INTO booking_history 
+              (user_id, room_number, room_date, room_time, reason, status, approver_by)
+                VALUES 
+              (?, ?, NOW(), ?, ?, '1', 0)
+                `;
             con.query(
               insertSql,
               [user_id, room_id, time_slot, reason],
@@ -333,9 +369,14 @@ app.get("/api/user/history/:uid", (req, res) => {
       bh.room_date,
       bh.room_time,
       bh.reason,
-      bh.status
+      bh.status,
+      u.username AS booked_by,
+      a.username AS approver_name,
+      bh.approver_comment              -- ✅ เพิ่มตรงนี้
     FROM booking_history bh
     JOIN booking b ON bh.room_number = b.room_id
+    JOIN \`user\` u ON bh.user_id = u.id
+    LEFT JOIN \`user\` a ON bh.approver_by = a.id
     WHERE bh.user_id = ? AND bh.status IN ('2', '3')
     ORDER BY bh.room_date DESC
   `;
@@ -347,6 +388,8 @@ app.get("/api/user/history/:uid", (req, res) => {
     res.json(result);
   });
 });
+
+
 
 ////////////////////////////////////////////////// Staff from toon //////////////////////////////////////////////////
 
@@ -572,61 +615,82 @@ app.get("/api/staff/history", (req, res) => {
 // ====================  UPDATE STATUS Dashboard page (Can be use all role) ==================== //
 app.put("/api/approver/booking/:id", (req, res) => {
   const { id } = req.params;
-  const { status } = req.body; // 2=approve, 3=reject
+  const { status, approver_id, reject_reason } = req.body; 
+  // status: "2" = approve, "3" = reject
 
-  if (!["2", "3"].includes(status))
+  if (!["2", "3"].includes(status)) {
     return res.status(400).json({ message: "Invalid status value" });
+  }
 
-  // อัปเดตตาราง booking_history
-  const updateHistory = "UPDATE booking_history SET status = ? WHERE id = ?";
-  con.query(updateHistory, [status, id], (err, result) => {
-    if (err) {
-      console.error("DB error /api/approver/booking (UPDATE history):", err);
-      return res
-        .status(500)
-        .json({ message: "Failed to update booking history" });
-    }
+  const approverIdValue = approver_id || null;
 
-    // ดึงข้อมูล booking_history ที่เพิ่งอัปเดต เพื่อเอาค่า room_number และ room_time ไปอัปเดตใน booking
-    const getHistory =
-      "SELECT room_number, room_time FROM booking_history WHERE id = ?";
-    con.query(getHistory, [id], (err2, rows) => {
-      if (err2 || rows.length === 0)
+  // ถ้า reject ให้เก็บข้อความ reject_reason, ถ้า approve ให้เป็น NULL
+  const commentValue =
+    status === "3" && reject_reason && reject_reason.trim() !== ""
+      ? reject_reason.trim()
+      : null;
+
+  // 1) อัปเดต booking_history: status + approver_by + approver_comment
+  const updateHistory = `
+    UPDATE booking_history 
+    SET status = ?, approver_by = ?, approver_comment = ? 
+    WHERE id = ?
+  `;
+
+  con.query(
+    updateHistory,
+    [status, approverIdValue, commentValue, id],
+    (err, result) => {
+      if (err) {
+        console.error("DB error /api/approver/booking (UPDATE history):", err);
         return res
-          .status(404)
-          .json({ message: "Booking history not found" });
+          .status(500)
+          .json({ message: "Failed to update booking history" });
+      }
 
-      const { room_number, room_time } = rows[0];
-
-      // กำหนดชื่อคอลัมน์ใน booking ที่จะอัปเดต เช่น room_8AM / room_10AM / room_1PM / room_3PM
-      let timeColumn = "";
-      if (room_time === 1) timeColumn = "room_8AM";
-      else if (room_time === 2) timeColumn = "room_10AM";
-      else if (room_time === 3) timeColumn = "room_1PM";
-      else if (room_time === 4) timeColumn = "room_3PM";
-
-      // ถ้า Approve ให้ค่าคอลัมน์นั้น = 3 (Reserved)
-      // ถ้า Reject ให้ค่าคอลัมน์นั้น = 1 (Free)
-      const newStatus = status === "2" ? 3 : 1;
-
-      const updateBooking =
-        "UPDATE booking SET " + timeColumn + " = ? WHERE room_id = ?";
-      con.query(updateBooking, [newStatus, room_number], (err3) => {
-        if (err3) {
-          console.error("DB error /api/approver/booking (UPDATE booking):", err3);
+      // 2) ดึง room_number, room_time เพื่อไปอัปเดต booking table
+      const getHistory =
+        "SELECT room_number, room_time FROM booking_history WHERE id = ?";
+      con.query(getHistory, [id], (err2, rows) => {
+        if (err2 || rows.length === 0) {
           return res
-            .status(500)
-            .json({ message: "Failed to update booking table" });
+            .status(404)
+            .json({ message: "Booking history not found" });
         }
-        res.json({
-          message:
-            status === "2"
-              ? "Booking approved and room reserved"
-              : "Booking rejected and room released",
+
+        const { room_number, room_time } = rows[0];
+
+        let timeColumn = "";
+        if (room_time === 1) timeColumn = "room_8AM";
+        else if (room_time === 2) timeColumn = "room_10AM";
+        else if (room_time === 3) timeColumn = "room_1PM";
+        else if (room_time === 4) timeColumn = "room_3PM";
+
+        const newStatus = status === "2" ? 3 : 1; // 3 = Reserved, 1 = Free
+
+        const updateBooking =
+          "UPDATE booking SET " + timeColumn + " = ? WHERE room_id = ?";
+        con.query(updateBooking, [newStatus, room_number], (err3) => {
+          if (err3) {
+            console.error(
+              "DB error /api/approver/booking (UPDATE booking):",
+              err3
+            );
+            return res
+              .status(500)
+              .json({ message: "Failed to update booking table" });
+          }
+
+          res.json({
+            message:
+              status === "2"
+                ? "Booking approved and room reserved"
+                : "Booking rejected and room released",
+          });
         });
       });
-    });
-  });
+    }
+  );
 });
 
 // ==================== API PROFILE CARD For staff/approver/user ========================== //
