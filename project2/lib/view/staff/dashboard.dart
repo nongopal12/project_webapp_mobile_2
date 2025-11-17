@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/history_staff.dart';
 import 'package:project2/view/staff/profile_staff.dart';
+import 'package:project2/view/staff/Room_browser_staff.dart'; // 👈 เพิ่ม import
 
 class Dashboard extends StatefulWidget {
-  final String username; // 👈 รับ username จาก login
+  final String username;
 
   const Dashboard({super.key, required this.username});
 
@@ -19,7 +19,7 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   // ---------------------------------------------------------------
-  // Dashboard data
+  // Variables for Dashboard data
   // ---------------------------------------------------------------
   int enableCount = 0;
   int pendingCount = 0;
@@ -28,28 +28,13 @@ class _DashboardState extends State<Dashboard> {
   bool isLoading = true;
 
   // ---------------------------------------------------------------
-  // Profile data
+  // Variables for Profile data
   // ---------------------------------------------------------------
   String profileName = '';
   String profileRole = '';
   String profileId = '';
+  String profileEmail = '';
   bool isProfileLoading = true;
-
-  // ✅ ใช้ baseUrl เดียวกับ AuthApi
-  final String baseUrl = AuthApi().baseUrl;
-
-  // ---------------------------------------------------------------
-  // ดึง token จาก SharedPreferences (ถ้ามี)
-  // ---------------------------------------------------------------
-  Future<Map<String, String>> _buildHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
 
   // ---------------------------------------------------------------
   // Fetch Dashboard Data
@@ -60,11 +45,8 @@ class _DashboardState extends State<Dashboard> {
     });
 
     try {
-      final headers = await _buildHeaders();
-
       final response = await http.get(
-        Uri.parse("$baseUrl/api/staff/dashboard"),
-        headers: headers,
+        Uri.parse("http://192.168.1.112:3000/api/staff/dashboard"),
       );
 
       if (response.statusCode == 200) {
@@ -77,7 +59,6 @@ class _DashboardState extends State<Dashboard> {
           isLoading = false;
         });
       } else {
-        print("❌ Failed to load dashboard: ${response.statusCode}");
         setState(() {
           isLoading = false;
         });
@@ -95,12 +76,10 @@ class _DashboardState extends State<Dashboard> {
   // ---------------------------------------------------------------
   Future<void> _fetchProfileData() async {
     try {
-      final headers = await _buildHeaders();
       final username = widget.username;
 
       final response = await http.get(
-        Uri.parse("$baseUrl/api/profile/$username"),
-        headers: headers,
+        Uri.parse("http://192.168.1.112:3000/api/profile/$username"),
       );
 
       if (response.statusCode == 200) {
@@ -109,10 +88,11 @@ class _DashboardState extends State<Dashboard> {
           profileName = data["username"] ?? '';
           profileRole = data["role_name"] ?? '';
           profileId = data["user_id"].toString();
+          profileEmail = data["user_email"] ?? '';
           isProfileLoading = false;
         });
       } else {
-        print("❌ Failed to load profile: ${response.statusCode}");
+        print(" Failed to load profile: ${response.statusCode}");
         setState(() => isProfileLoading = false);
       }
     } catch (e) {
@@ -134,7 +114,6 @@ class _DashboardState extends State<Dashboard> {
   void _onItemTapped(int index) {
     switch (index) {
       case 0:
-        // อยู่หน้า Main แล้ว ไม่ต้องทำอะไร
         break;
       case 1:
         Navigator.pushReplacement(
@@ -183,11 +162,7 @@ class _DashboardState extends State<Dashboard> {
               backgroundColor: const Color(0xFF883C31),
               foregroundColor: Colors.white,
             ),
-            onPressed: () async {
-              // ถ้าใช้ SharedPreferences เก็บ token/uid ก็ลบออกตรงนี้ได้
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-
+            onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Logged out successfully.')),
@@ -269,6 +244,10 @@ class _DashboardState extends State<Dashboard> {
               _buildProfileCard(context),
               const SizedBox(height: 20),
 
+              // 👇 ปุ่ม Show Room (ใหม่)
+              _buildShowRoomButton(context),
+              const SizedBox(height: 16),
+
               if (isLoading)
                 const Center(
                   child: Padding(
@@ -330,7 +309,9 @@ class _DashboardState extends State<Dashboard> {
         type: BottomNavigationBarType.fixed,
         backgroundColor: mainAppColor,
         selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
+        unselectedItemColor: Colors.white.withOpacity(0.6),
+        selectedFontSize: 14,
+        unselectedFontSize: 12,
         currentIndex: 0,
         onTap: _onItemTapped,
         items: const [
@@ -344,7 +325,56 @@ class _DashboardState extends State<Dashboard> {
   }
 
   // ---------------------------------------------------------------
-  // Profile Card (แสดงเฉพาะ ID + Position)
+  // Show Room Button
+  // ---------------------------------------------------------------
+  Widget _buildShowRoomButton(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const RoomBrowserPage()),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF883C31), Color(0xFFA84B3E)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF883C31).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.meeting_room_rounded, color: Colors.white, size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Show Room',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // Profile Card
   // ---------------------------------------------------------------
   Widget _buildProfileCard(BuildContext context) {
     if (isProfileLoading) {
@@ -374,21 +404,32 @@ class _DashboardState extends State<Dashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ✅ แสดง ID เท่านั้น
                 Text(
-                  'ID: ${profileId.padLeft(5, '0')}',
+                  profileName,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Color(0xFF883C31),
                   ),
                 ),
                 const SizedBox(height: 2),
-                // ✅ แสดง Position จาก role_name
+                Text(
+                  'ID: ${profileId.padLeft(5, '0')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 Text(
                   'Position: $profileRole',
-                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                  style: const TextStyle(fontSize: 11),
                 ),
+                if (profileEmail.isNotEmpty)
+                  Text(
+                    'Email: $profileEmail',
+                    style: const TextStyle(fontSize: 10, color: Colors.black87),
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             ),
           ),
@@ -410,7 +451,7 @@ class _DashboardState extends State<Dashboard> {
   ) {
     return Card(
       elevation: 1,
-      color: const Color.fromARGB(255, 223, 220, 220),
+      color: const Color.fromARGB(255, 243, 240, 240),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12.0),

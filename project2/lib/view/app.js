@@ -529,33 +529,27 @@ app.get("/api/staff/rooms", (req, res) => {
       room_location,
       room_capacity,
       room_img AS imagePath,
-      
-      -- สร้างชื่อห้องจาก ชั้น และ เลขห้อง (เช่น Room 101, Room 203)
       CONCAT('Room ', room_location, '0', room_number) AS name,
-      
-      -- สร้าง Location (เช่น 1st Floor, 2nd Floor)
       CONCAT(room_location, ' Floor') AS location,
-      
-      -- สร้าง Status รวมของห้อง
       CASE
         WHEN room_8AM = 4 AND room_10AM = 4 AND room_1PM = 4 AND room_3PM = 4 THEN 'Disable'
         WHEN room_8AM = 3 OR room_10AM = 3 OR room_1PM = 3 OR room_3PM = 3 THEN 'Reserved'
         WHEN room_8AM = 2 OR room_10AM = 2 OR room_1PM = 2 OR room_3PM = 2 THEN 'Pending'
         ELSE 'Enable'
       END AS status
-      
     FROM booking
-    ORDER BY room_id ASC;
+    ORDER BY room_location ASC, room_number ASC;
   `;
 
   con.query(sql, (err, results) => {
     if (err) {
-      console.error("DB error /api/staff/rooms (GET):", err);
+      console.error("DB error /api/staff/rooms:", err);
       return res.status(500).json({ message: "Database error" });
     }
     res.json(results);
   });
 });
+
 
 // ====================  Add Room Staff ===================== //
 app.post("/api/staff/rooms", (req, res) => {
@@ -565,33 +559,44 @@ app.post("/api/staff/rooms", (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // แยกเอาเฉพาะชื่อไฟล์ภาพ
-  const imageName = room_img.split("/").pop();
-  const sqlInsert = `
-    INSERT INTO booking 
-      (room_number, room_location, room_capacity, room_img, room_date, room_8AM, room_10AM, room_1PM, room_3PM) 
-    VALUES 
-      (?, ?, ?, ?, NOW(), 1, 1, 1, 1);
+  // 🔍 CHECK DUPLICATE: ห้องเลขเดียวกัน + ชั้นเดียวกัน ห้ามซ้ำ
+  const sqlCheckDup = `
+    SELECT * FROM booking 
+    WHERE room_number = ? AND room_location = ?
   `;
 
-  con.query(
-    sqlInsert,
-    [room_number, room_location, room_capacity, imageName],
-    (err, result) => {
-      if (err) {
-        console.error("DB error /api/staff/rooms (POST):", err);
-        return res.status(500).json({ message: "Failed to create room" });
-      }
+  con.query(sqlCheckDup, [room_number, room_location], (err, rows) => {
+    if (err) return res.status(500).json({ message: "Database error" });
 
-      const newRoomId = result.insertId;
-      const sqlUpdateId =
-        "UPDATE booking SET room_number_id = ? WHERE room_id = ?";
-
-      con.query(sqlUpdateId, [newRoomId, newRoomId], () => {
-        res.status(201).json({ message: "Room created successfully" });
-      });
+    if (rows.length > 0) {
+      return res
+        .status(400)
+        .json({ message: "This room already exists on this floor." });
     }
-  );
+
+    // ถ้าไม่ซ้ำ → เพิ่มห้องได้
+    const imageName = room_img.split("/").pop();
+    const sqlInsert = `
+      INSERT INTO booking 
+        (room_number, room_location, room_capacity, room_img, room_date, room_8AM, room_10AM, room_1PM, room_3PM) 
+      VALUES (?, ?, ?, ?, NOW(), 1,1,1,1)
+    `;
+
+    con.query(
+      sqlInsert,
+      [room_number, room_location, room_capacity, imageName],
+      (err) => {
+        if (err) {
+          console.error("DB error /api/staff/rooms (POST):", err);
+          return res.status(500).json({ message: "Failed to create room" });
+        }
+
+        return res.status(201).json({
+          message: "Room created successfully",
+        });
+      }
+    );
+  });
 });
 
 // ====================  Edit Room Staff ===================== //
@@ -600,27 +605,53 @@ app.put("/api/staff/rooms/:id", (req, res) => {
   const { room_number, room_capacity } = req.body;
 
   if (!room_number || !room_capacity) {
-    return res
-      .status(400)
-      .json({ message: "Missing required fields: room_number, room_capacity" });
+    return res.status(400).json({ message: "Missing fields" });
   }
 
-  const sql = `
-    UPDATE booking 
-    SET 
-      room_number = ?, 
-      room_capacity = ?
-    WHERE room_id = ?
+  // 🔍 หาชั้นของห้องนี้ก่อน (เอา room_location เดิม)
+  const sqlGetLocation = `
+    SELECT room_location FROM booking WHERE room_id = ?
   `;
-  con.query(sql, [room_number, room_capacity, id], (err, result) => {
-    if (err) {
-      console.error("DB error /api/staff/rooms (PUT):", err);
-      return res.status(500).json({ message: "Failed to update room" });
-    }
-    if (result.affectedRows === 0) {
+
+  con.query(sqlGetLocation, [id], (err, rows) => {
+    if (err || rows.length === 0) {
       return res.status(404).json({ message: "Room not found" });
     }
-    res.json({ message: "Room updated successfully" });
+
+    const room_location = rows[0].room_location;
+
+    // 🔍 CHECK DUPLICATE: ห้ามใช้เลขห้องที่มีอยู่แล้วในชั้นเดียวกัน
+    const sqlCheckDup = `
+      SELECT * FROM booking 
+      WHERE room_number = ? 
+      AND room_location = ?
+      AND room_id != ?
+    `;
+
+    con.query(sqlCheckDup, [room_number, room_location, id], (err2, dup) => {
+      if (err2) return res.status(500).json({ message: "Database error" });
+
+      if (dup.length > 0) {
+        return res.status(400).json({
+          message: "This room number already exists on this floor.",
+        });
+      }
+
+      // ไม่มีซ้ำ → ทำการแก้ไข
+      const sqlUpdate = `
+        UPDATE booking 
+        SET room_number = ?, 
+            room_capacity = ?
+        WHERE room_id = ?
+      `;
+
+      con.query(sqlUpdate, [room_number, room_capacity, id], (err3) => {
+        if (err3)
+          return res.status(500).json({ message: "Failed to update room" });
+
+        return res.json({ message: "Room updated successfully" });
+      });
+    });
   });
 });
 
@@ -673,6 +704,7 @@ app.get("/api/staff/history", (req, res) => {
       u.username AS name,
       CONCAT('Room ', b.room_location, '0', b.room_number) AS room,
       DATE_FORMAT(h.room_date, '%e %b %Y') AS date, 
+      
       CASE h.room_time 
         WHEN 1 THEN '8:00 AM - 10:00 AM'
         WHEN 2 THEN '10:00 AM - 12:00 PM'
@@ -680,23 +712,29 @@ app.get("/api/staff/history", (req, res) => {
         WHEN 4 THEN '3:00 PM - 5:00 PM'
         ELSE 'Unknown' 
       END AS time,
+
       h.reason,
-      CASE h.status 
+
+      CASE h.status
         WHEN '1' THEN 'Pending'
         WHEN '2' THEN 'Approved'
-        WHEN '3' THEN 'Reject' 
-        ELSE 'Unknown' 
+        WHEN '3' THEN 'Reject'
+        ELSE 'Unknown'
       END AS status,
-      -- ✅ เอาชื่อไฟล์รูปห้องออกมาด้วย
-      b.room_img AS image
-    FROM 
-      booking_history AS h
-    JOIN 
-      user AS u ON h.user_id = u.id
-    JOIN 
-      booking AS b ON h.room_number = b.room_id
-    ORDER BY 
-      h.room_date DESC;
+
+      b.room_img AS image,
+
+      -- 👇 เพิ่มชื่อ Approver 
+      a.username AS approver_name,
+
+      -- 👇 เพิ่ม Comment ของ Approver
+      h.approver_comment
+
+    FROM booking_history AS h
+    JOIN user AS u ON h.user_id = u.id
+    JOIN booking AS b ON h.room_number = b.room_id
+    LEFT JOIN user AS a ON h.approver_by = a.id   -- 👈 เพิ่ม join นี้
+    ORDER BY h.room_date DESC, h.room_time DESC;
   `;
 
   con.query(sql, (err, results) => {

@@ -59,7 +59,7 @@ class Browser extends StatefulWidget {
 }
 
 class _BrowserState extends State<Browser> {
-  final String _baseUrl = 'http://192.168.1.123:3000/api/staff/rooms';
+  final String _baseUrl = 'http://192.168.1.112:3000/api/staff/rooms';
   late Future<List<Room>> _roomsFuture;
 
   @override
@@ -499,7 +499,7 @@ class _BrowserState extends State<Browser> {
     }
 
     return Card(
-      color: const Color.fromARGB(255, 223, 220, 220),
+      color: const Color.fromARGB(255, 243, 240, 240),
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: Row(

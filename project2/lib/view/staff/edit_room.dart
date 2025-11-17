@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 class EditRoom extends StatefulWidget {
   final String initialImagePath;
   final int initialRoomNumber;
-  final int initialLocation; // To display Floor
+  final int initialLocation;
   final int initialCapacity;
 
   const EditRoom({
@@ -21,9 +21,9 @@ class EditRoom extends StatefulWidget {
 }
 
 class _EditRoomState extends State<EditRoom> {
-  // ================================================================
+  // ===============================================================
   // Section 1: Controllers
-  // ================================================================
+  // ===============================================================
   late TextEditingController _roomNumberController;
   late TextEditingController _capacityController;
 

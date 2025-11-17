@@ -25,7 +25,6 @@ class _AddRoomState extends State<AddRoom> {
     "assets/images/MeetingRoomE.jpg",
     "assets/images/Meeting-RoomF.jpg",
     "assets/images/Meeting-RoomG.jpg",
-    "assets/images/Meeting-RoomH.jpg",
   ];
   int _currentImageIndex = 0;
 

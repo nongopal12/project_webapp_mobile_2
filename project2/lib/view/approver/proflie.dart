@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:project2/view/approver/home.dart';
 import 'package:project2/view/approver/approve.dart';
 import 'package:project2/view/approver/history_approver.dart';
@@ -67,19 +66,19 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text('ผิดพลาด: $_error'))
-                : Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: EmployeeIdCardHorizontal(
-                        name: _username.isEmpty ? '-' : _username,
-                        role: _role,
-                        employeeId: _userId == null ? '-' : '#${_userId!}',
-                        email: _email,
-                        department: 'QuickRoom System',
-                      ),
-                    ),
+            ? Center(child: Text('ผิดพลาด: $_error'))
+            : Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: EmployeeIdCardHorizontal(
+                    name: _username.isEmpty ? '-' : _username,
+                    role: _role,
+                    employeeId: _userId == null ? '-' : '#${_userId!}',
+                    email: _email,
+                    department: 'QuickRoom System',
                   ),
+                ),
+              ),
       ),
       bottomNavigationBar: _buildBottomBar(context),
     );
@@ -98,7 +97,11 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
         color: PColors.primaryRed,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
-          BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -2)),
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 12,
+            offset: Offset(0, -2),
+          ),
         ],
       ),
       child: SafeArea(
@@ -113,13 +116,22 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
                   setState(() => _currentIndex = i);
                   switch (i) {
                     case 0:
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeApprover()));
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HomeApprover()),
+                      );
                       break;
                     case 1:
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ApprovePage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ApprovePage()),
+                      );
                       break;
                     case 2:
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HistoryPage()),
+                      );
                       break;
                     case 3:
                       break;
@@ -128,7 +140,11 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(items[i].icon, size: 22, color: active ? PColors.gold : Colors.white),
+                    Icon(
+                      items[i].icon,
+                      size: 22,
+                      color: active ? PColors.gold : Colors.white,
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       items[i].label,
@@ -187,7 +203,11 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         boxShadow: const [
-          BoxShadow(color: Color(0x22000000), blurRadius: 12, offset: Offset(0, 6)),
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -230,10 +250,17 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(.9),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(.6), width: 2),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(.6),
+                        width: 2,
+                      ),
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.person, size: 60, color: PColors.primaryRed),
+                    child: const Icon(
+                      Icons.person,
+                      size: 60,
+                      color: PColors.primaryRed,
+                    ),
                   ),
                   const SizedBox(width: 16),
 
@@ -245,10 +272,21 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w900, overflow: TextOverflow.ellipsis)),
-                          Text(role, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            role,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           const SizedBox(height: 10),
                           _kv('ID', employeeId),
                           _kv('Department', department),
@@ -290,18 +328,28 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
   }
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text('$k :',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: Colors.white)),
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$k :',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12.5,
+              color: Colors.white,
             ),
-            Expanded(
-              child: Text(v, style: const TextStyle(fontSize: 12.5), overflow: TextOverflow.ellipsis),
-            ),
-          ],
+          ),
         ),
-      );
+        Expanded(
+          child: Text(
+            v,
+            style: const TextStyle(fontSize: 12.5),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
 }
