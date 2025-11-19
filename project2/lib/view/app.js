@@ -559,7 +559,7 @@ app.post("/api/staff/rooms", (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // 🔍 CHECK DUPLICATE: ห้องเลขเดียวกัน + ชั้นเดียวกัน ห้ามซ้ำ
+  // 🔍 CHECK DUPLICATE
   const sqlCheckDup = `
     SELECT * FROM booking
     WHERE room_number = ? AND room_location = ?
@@ -569,38 +569,49 @@ app.post("/api/staff/rooms", (req, res) => {
     if (err) return res.status(500).json({ message: "Database error" });
 
     if (rows.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "This room already exists on this floor." });
+      return res.status(400).json({
+        message: "This room already exists on this floor.",
+      });
     }
 
-    // ใช้ชื่อไฟล์รูปอย่างเดียว
     const imageName = room_img.split("/").pop();
 
+    // 1) INSERT แบบไม่ใส่ room_number_id
     const sqlInsert = `
       INSERT INTO booking 
-        (room_number_id, room_number, room_capacity, room_location, room_date, room_img,
+        (room_number, room_capacity, room_location, room_date, room_img,
          room_8AM, room_10AM, room_1PM, room_3PM)
-      VALUES (?, ?, ?, ?, NOW(), ?, 1, 1, 1, 1)
+      VALUES (?, ?, ?, NOW(), ?, 1, 1, 1, 1)
     `;
 
     con.query(
       sqlInsert,
-      [
-        room_number,        // room_number_id (ใช้เหมือน room_id)
-        room_number,        // room_number
-        room_capacity,
-        room_location,
-        imageName
-      ],
-      (err) => {
+      [room_number, room_capacity, room_location, imageName],
+      (err, result) => {
         if (err) {
-          console.error("DB error /api/staff/rooms (POST):", err);
+          console.error("DB error /api/staff/rooms INSERT:", err);
           return res.status(500).json({ message: "Failed to create room" });
         }
 
-        return res.status(201).json({
-          message: "Room created successfully",
+        const newRoomId = result.insertId; // 🔥 ได้ room_id ที่เพิ่งสร้าง
+
+        // 2) UPDATE room_number_id = room_id
+        const sqlUpdate = `
+          UPDATE booking
+          SET room_number_id = ?
+          WHERE room_id = ?
+        `;
+
+        con.query(sqlUpdate, [newRoomId, newRoomId], (err) => {
+          if (err) {
+            console.error("DB error UPDATE room_number_id:", err);
+            return res.status(500).json({ message: "Failed to update room_number_id" });
+          }
+
+          return res.status(201).json({
+            message: "Room created successfully",
+            room_id: newRoomId,
+          });
         });
       }
     );
