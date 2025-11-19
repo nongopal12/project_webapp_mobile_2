@@ -561,7 +561,7 @@ app.post("/api/staff/rooms", (req, res) => {
 
   // 🔍 CHECK DUPLICATE: ห้องเลขเดียวกัน + ชั้นเดียวกัน ห้ามซ้ำ
   const sqlCheckDup = `
-    SELECT * FROM booking 
+    SELECT * FROM booking
     WHERE room_number = ? AND room_location = ?
   `;
 
@@ -574,17 +574,25 @@ app.post("/api/staff/rooms", (req, res) => {
         .json({ message: "This room already exists on this floor." });
     }
 
-    // ถ้าไม่ซ้ำ → เพิ่มห้องได้
+    // ใช้ชื่อไฟล์รูปอย่างเดียว
     const imageName = room_img.split("/").pop();
+
     const sqlInsert = `
       INSERT INTO booking 
-        (room_number, room_location, room_capacity, room_img, room_date, room_8AM, room_10AM, room_1PM, room_3PM) 
-      VALUES (?, ?, ?, ?, NOW(), 1,1,1,1)
+        (room_number_id, room_number, room_capacity, room_location, room_date, room_img,
+         room_8AM, room_10AM, room_1PM, room_3PM)
+      VALUES (?, ?, ?, ?, NOW(), ?, 1, 1, 1, 1)
     `;
 
     con.query(
       sqlInsert,
-      [room_number, room_location, room_capacity, imageName],
+      [
+        room_number,        // room_number_id (ใช้เหมือน room_id)
+        room_number,        // room_number
+        room_capacity,
+        room_location,
+        imageName
+      ],
       (err) => {
         if (err) {
           console.error("DB error /api/staff/rooms (POST):", err);
