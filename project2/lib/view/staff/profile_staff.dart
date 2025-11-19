@@ -6,7 +6,7 @@ import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/dashboard.dart';
 import 'package:project2/view/staff/history_staff.dart';
 
-const String kBaseUrl = "http://192.168.1.112:3000";
+const String kBaseUrl = "http://192.168.1.123:3000";
 
 class PColors {
   static const bg = Color(0xFFF7F7F9);

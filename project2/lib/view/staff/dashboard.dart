@@ -46,7 +46,7 @@ class _DashboardState extends State<Dashboard> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.1.112:3000/api/staff/dashboard"),
+        Uri.parse("http://192.168.1.123:3000/api/staff/dashboard"),
       );
 
       if (response.statusCode == 200) {
@@ -79,7 +79,7 @@ class _DashboardState extends State<Dashboard> {
       final username = widget.username;
 
       final response = await http.get(
-        Uri.parse("http://192.168.1.112:3000/api/profile/$username"),
+        Uri.parse("http://192.168.1.123:3000/api/profile/$username"),
       );
 
       if (response.statusCode == 200) {

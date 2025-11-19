@@ -62,7 +62,7 @@ class HistoryStaff extends StatefulWidget {
 class _HistoryStaffState extends State<HistoryStaff> {
   late Future<List<HistoryItem>> _historyFuture;
 
-  final String apiUrl = 'http://192.168.1.112:3000/api/staff/history';
+  final String apiUrl = 'http://192.168.1.123:3000/api/staff/history';
 
   @override
   void initState() {

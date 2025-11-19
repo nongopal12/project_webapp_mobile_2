@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-/// ===== ตั้งค่าเซิร์ฟเวอร์ =====
-const String kBaseUrl = "http://192.168.1.123:3000"; // แก้ให้ตรง backend ของคุณ
+/// ===== Server config =====
+const String kBaseUrl = "http://192.168.1.123:3000";
 
 /// ===== THEME =====
 class QColors {
@@ -14,11 +14,11 @@ class QColors {
   static const Color text = Color(0xFF2E2E2E);
   static const Color free = Color(0xFF2ECC71);
   static const Color pending = Color(0xFFF1C40F);
-  static const reserved = Color(0xFFE74C3C);  // 🔥 แดง (ใหม่)
-  static const disabled = Color(0xFF9E9E9E);  // ⚪ เทา (ใหม่)
+  static const Color reserved = Color(0xFFE74C3C);  // 🔥 Red
+  static const Color disabled = Color(0xFF9E9E9E);  // ⚪ Grey
 }
 
-/// ===== Model: ข้อมูลห้องจาก /api/rooms =====
+/// ===== Model: room data from /api/rooms =====
 class RoomFull {
   final int roomId;
   final int roomNumber;
@@ -55,7 +55,7 @@ class RoomFull {
       );
 }
 
-/// แปลงสถานะตัวเลขจาก DB → ข้อความ/UI
+/// Map numeric status code from DB → UI text
 String mapCodeToUi(int code) {
   switch (code) {
     case 1:
@@ -65,6 +65,7 @@ String mapCodeToUi(int code) {
     case 3:
       return 'Reserved';
     case 4:
+    case 5:
       return 'Disabled';
     default:
       return 'Unknown';
@@ -89,7 +90,7 @@ Color statusColor(String s) {
 /// ===== SLOT helper =====
 class _SlotSpec {
   final String label;
-  final int index; // ใช้ 1=8AM,2=10AM,3=1PM,4=3PM
+  final int index; // 1=8AM, 2=10AM, 3=1PM, 4=3PM
   const _SlotSpec(this.label, this.index);
 }
 
@@ -100,17 +101,18 @@ const _slots = <_SlotSpec>[
   _SlotSpec('15:00', 4),
 ];
 
-/// ===== API: โหลดห้องวันนี้ทั้งหมด แล้วกรองตามสถานะ+ช่วงเวลา =====
+/// ===== API: load all rooms for today then filter by status + time slot =====
 Future<List<RoomFull>> fetchRoomsBy(String uiStatus, int slotIndex) async {
   final uri = Uri.parse('$kBaseUrl/api/rooms');
   final res = await http.get(uri);
   if (res.statusCode != 200) {
-    throw Exception('โหลดรายการห้องไม่สำเร็จ (${res.statusCode})');
+    throw Exception('Failed to load rooms (${res.statusCode})');
   }
   final List data = json.decode(res.body) as List;
-  final all = data.map((e) => RoomFull.fromJson(e as Map<String, dynamic>)).toList();
+  final all =
+      data.map((e) => RoomFull.fromJson(e as Map<String, dynamic>)).toList();
 
-  // เลือกคอลัมน์ตาม slot
+  // Pick status column by time slot
   int pickStatus(RoomFull r) {
     switch (slotIndex) {
       case 1:
@@ -119,6 +121,7 @@ Future<List<RoomFull>> fetchRoomsBy(String uiStatus, int slotIndex) async {
         return r.s10;
       case 3:
         return r.s13;
+      case 5:
       case 4:
         return r.s15;
       default:
@@ -129,9 +132,9 @@ Future<List<RoomFull>> fetchRoomsBy(String uiStatus, int slotIndex) async {
   return all.where((r) => mapCodeToUi(pickStatus(r)) == uiStatus).toList();
 }
 
-/// ===== PAGE: แสดงห้องตาม 'สถานะ' + มี Tab เลือก 'ช่วงเวลา' =====
+/// ===== PAGE: show rooms by "status" + Tab for "time slot" =====
 class StatusRoomPage extends StatefulWidget {
-  final String status; // Free/Pending/Reserved/Disabled
+  final String status; // Free / Pending / Reserved / Disabled
   const StatusRoomPage({super.key, required this.status});
 
   @override
@@ -142,7 +145,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
   late Future<List<RoomFull>> _future;
-  int _currentSlot = 1; // 1=8AM เริ่มต้น
+  int _currentSlot = 1; // 1 = 8AM (default)
 
   @override
   void initState() {
@@ -169,7 +172,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
     return Scaffold(
       backgroundColor: QColors.bg,
       appBar: AppBar(
-        title: Text('สถานะห้อง : ${widget.status}'),
+        title: Text('Room Status: ${widget.status}'),
         backgroundColor: QColors.primaryRed,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -190,14 +193,15 @@ class _StatusRoomPageState extends State<StatusRoomPage>
           }
           if (snap.hasError) {
             return Center(
-              child: Text('ผิดพลาด: ${snap.error}'),
+              child: Text('Error: ${snap.error}'),
             );
           }
           final rooms = snap.data ?? [];
           if (rooms.isEmpty) {
             return Center(
               child: Text(
-                'ไม่มีห้องในสถานะ "${widget.status}"\nช่วงเวลา: ${_slots[_tab.index].label}',
+                'No rooms in status "${widget.status}"\n'
+                'Time slot: ${_slots[_tab.index].label}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: QColors.text.withOpacity(0.65),
@@ -213,7 +217,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
             itemBuilder: (_, i) {
               final r = rooms[i];
 
-              // คำนวณสถานะของห้องใน slot ปัจจุบัน (เพื่อโชว์ในการ์ด)
+              // Compute the status for current slot (for card display)
               final code = () {
                 switch (_currentSlot) {
                   case 1:
@@ -223,6 +227,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
                   case 3:
                     return r.s13;
                   case 4:
+                  case 5:
                     return r.s15;
                   default:
                     return r.s8;
@@ -257,7 +262,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              // เช่น Room 101 / 203
+                              // Example: Room 101 / 203
                               'Room ${r.roomLocation}0${r.roomNumber}',
                               style: const TextStyle(
                                 fontSize: 16,
@@ -266,7 +271,7 @@ class _StatusRoomPageState extends State<StatusRoomPage>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Status : $ui',
+                              'Status: $ui',
                               style: TextStyle(
                                 color: statusColor(ui),
                                 fontWeight: FontWeight.w700,
@@ -296,14 +301,17 @@ class _StatusRoomPageState extends State<StatusRoomPage>
   }
 }
 
-/// แสดงรูป: ลองโหลด asset ก่อน ถ้าไม่พบ fallback เป็นรูปจาก backend (/assets/<filename>)
+/// Room image widget:
+/// 1) Try to load from local assets
+/// 2) If not found, fallback to backend URL (/assets/<filename>)
 class _RoomImage extends StatelessWidget {
   final String imageName;
   const _RoomImage({required this.imageName});
 
   @override
   Widget build(BuildContext context) {
-    final assetGuess = 'assets/images/${imageName.isEmpty ? 'Meeting-RoomA.jpg' : imageName}';
+    final assetGuess =
+        'assets/images/${imageName.isEmpty ? 'Meeting-RoomA.jpg' : imageName}';
     return Image.asset(
       assetGuess,
       width: 90,

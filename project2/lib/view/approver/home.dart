@@ -9,13 +9,13 @@ import 'package:project2/view/approver/proflie.dart';
 import 'package:project2/view/login.dart';
 import 'approve.dart';
 import 'proflie.dart';
-import 'approve_detail.dart'; // <-- หน้าใหม่ที่เราจะสร้าง
+import 'approve_detail.dart';
 import 'room_browser.dart';
 
 /// ===== Backend base URL =====
 const String kBaseUrl = "http://192.168.1.123:3000";
 
-/// ===== THEME (โทนสี QuickRoom) =====
+/// ===== THEME (QuickRoom colors) =====
 class QColors {
   static const Color bg = Color(0xFFF7F7F9);
   static const Color primaryRed = Color(0xFF7A2E22);
@@ -30,11 +30,11 @@ class QColors {
 }
 
 class BookingItem {
-  final int id;            // booking_history.id
-  final String userName;   // u.username
-  final String room;       // "Room 101" ...
-  final String time;       // "8:00 AM - 10:00 AM"
-  final String imagePath;  // ชื่อไฟล์รูปจาก DB เช่น "Meeting-RoomA.jpg"
+  final int id;           // booking_history.id
+  final String userName;  // u.username
+  final String room;      // "Room 101" ...
+  final String time;      // "8:00 AM - 10:00 AM"
+  final String imagePath; // file name from DB, e.g. "Meeting-RoomA.jpg"
 
   BookingItem({
     required this.id,
@@ -50,14 +50,14 @@ class BookingItem {
       userName: (j['name'] ?? '').toString(),
       room: (j['room'] ?? '').toString(),
       time: (j['time'] ?? '').toString(),
-      imagePath: (j['image'] ?? '').toString(),   // ✅ มาจาก API ที่เราเพิ่งเพิ่ม
+      imagePath: (j['image'] ?? '').toString(),
     );
   }
 }
 
 /// ====== HOME (Approver) ======
 class HomeApprover extends StatefulWidget {
-  final String? username; // จะรับจากหน้า login ได้
+  final String? username; // from login page (if provided)
   const HomeApprover({super.key, this.username});
 
   @override
@@ -65,28 +65,28 @@ class HomeApprover extends StatefulWidget {
 }
 
 class _HomeApproverState extends State<HomeApprover> {
-  // ======= STATE จาก DB =======
+  // ======= STATE from DB =======
   bool _loading = true;
   String? _error;
 
-  // โปรไฟล์จาก /api/profile/:username
+  // Profile from /api/profile/:username
   String _displayName = '';
   String _displayEmail = '';
   String _displayRole = 'Approver';
 
-  // สถิติห้องจาก /api/staff/dashboard
+  // Room stats from /api/staff/dashboard
   int _countFree = 0;     // Enable
   int _countPending = 0;  // Pending
   int _countReserved = 0; // Reserved
-  int _countDisabled = 0; // Disable
+  int _countDisabled = 0; // Disabled
 
-  // รายการคำขอ (Pending) สำหรับลิสต์ด้านล่าง (ดึงจริง)
+  // Pending booking list (from DB)
   final List<BookingItem> _orders = [];
 
   int _currentIndex = 0;
 
-  // mock กล่องข้อความเดิมไว้เหมือนเดิม
-final List<_Msg> _messages = [];
+  // Notification messages
+  final List<_Msg> _messages = [];
 
   @override
   void initState() {
@@ -94,29 +94,26 @@ final List<_Msg> _messages = [];
     _loadAll();
   }
 
- Future<void> _loadAll() async {
-  setState(() {
-    _loading = true;
-    _error = null;
-  });
+  Future<void> _loadAll() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-  try {
-    final username = await _resolveUsername();
-    await _fetchProfile(username);
-    await _fetchDashboard();
-    await _fetchPendingOrders();      // ← เรียกแค่ครั้งเดียวพอ
-    await _fetchNotificationMsgs();   // ← โหลดข้อความแจ้งเตือนจริง
-  } catch (e) {
-    _error = e.toString();
-  } finally {
-    if (mounted) setState(() => _loading = false);
+    try {
+      final username = await _resolveUsername();
+      await _fetchProfile(username);
+      await _fetchDashboard();
+      await _fetchPendingOrders();
+      await _fetchNotificationMsgs();
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
-}
 
-
-
-
-  /// หา username: รับจาก widget หรืออ่านจาก SharedPreferences('username')
+  /// Resolve username: from widget or SharedPreferences('username')
   Future<String> _resolveUsername() async {
     if (widget.username != null && widget.username!.trim().isNotEmpty) {
       return widget.username!;
@@ -133,7 +130,7 @@ final List<_Msg> _messages = [];
     final uri = Uri.parse('$kBaseUrl/api/profile/$username');
     final res = await http.get(uri);
     if (res.statusCode != 200) {
-      throw Exception('โหลดโปรไฟล์ไม่สำเร็จ (${res.statusCode})');
+      throw Exception('Failed to load profile (${res.statusCode})');
     }
     final data = json.decode(res.body) as Map<String, dynamic>;
     _displayName = (data['username'] ?? '').toString();
@@ -145,7 +142,7 @@ final List<_Msg> _messages = [];
     final uri = Uri.parse('$kBaseUrl/api/staff/dashboard');
     final res = await http.get(uri);
     if (res.statusCode != 200) {
-      throw Exception('โหลดข้อมูลสถิติห้องไม่สำเร็จ (${res.statusCode})');
+      throw Exception('Failed to load dashboard stats (${res.statusCode})');
     }
     final data = (json.decode(res.body) as Map<String, dynamic>);
     _countFree = int.tryParse('${data['enable_count'] ?? 0}') ?? 0;
@@ -154,12 +151,12 @@ final List<_Msg> _messages = [];
     _countDisabled = int.tryParse('${data['disabled_count'] ?? 0}') ?? 0;
   }
 
-  /// ดึงคำขอทั้งหมด แล้วกรอง Pending (สถานะ 'Pending')
+  /// Get all booking requests, then filter Pending
   Future<void> _fetchPendingOrders() async {
     final uri = Uri.parse('$kBaseUrl/api/staff/history');
     final res = await http.get(uri);
     if (res.statusCode != 200) {
-      throw Exception('โหลดรายการคำขอไม่สำเร็จ (${res.statusCode})');
+      throw Exception('Failed to load booking requests (${res.statusCode})');
     }
     final List data = json.decode(res.body) as List;
     final pending = data.where((e) => (e['status'] ?? '') == 'Pending');
@@ -171,111 +168,109 @@ final List<_Msg> _messages = [];
       ..clear()
       ..addAll(list);
   }
-Future<void> _fetchNotificationMsgs() async {
-  final uri = Uri.parse('$kBaseUrl/api/staff/history');
-  final res = await http.get(uri);
 
-  if (res.statusCode != 200) {
-    throw Exception('โหลดข้อความแจ้งเตือนไม่สำเร็จ (${res.statusCode})');
-  }
+  /// Build notification messages from pending requests
+  Future<void> _fetchNotificationMsgs() async {
+    final uri = Uri.parse('$kBaseUrl/api/staff/history');
+    final res = await http.get(uri);
 
-  final List data = json.decode(res.body) as List;
-
-  // เอาเฉพาะคำขอที่สถานะ Pending
-  final pendingList = data.where((e) => (e['status'] ?? '') == 'Pending');
-
-  final msgs = pendingList.map<_Msg>((e) {
-    final id = e['id'];
-    final room = (e['room'] ?? '').toString();      // เช่น Room 102
-    final timeRange = (e['time'] ?? '').toString(); // เช่น 1:00 PM - 3:00 PM
-
-    // ===== ดึงเวลาจาก room_date =====
-    final dateStr = (e['room_date'] ?? '').toString();
-    String displayTime = '-';
-
-    // พยายาม parse เป็น DateTime ก่อน (รองรับทั้ง "2025-11-21 18:59:12" และ "2025-11-21T18:59:12Z")
-    final dt = DateTime.tryParse(dateStr);
-    if (dt != null) {
-      final hh = dt.hour.toString().padLeft(2, '0');
-      final mm = dt.minute.toString().padLeft(2, '0');
-      displayTime = '$hh:$mm';
-    } else if (dateStr.length >= 16) {
-      // แผนเผื่อ: ถ้า parse ไม่ผ่าน แต่ string ยาวพอ ให้ตัดเอา index 11-16
-      displayTime = dateStr.substring(11, 16);
+    if (res.statusCode != 200) {
+      throw Exception('Failed to load notifications (${res.statusCode})');
     }
 
-    final orderNo = id is int
-        ? 'ORDER${id.toString().padLeft(4, '0')}'
-        : 'ORDER$id';
+    final List data = json.decode(res.body) as List;
 
-    return _Msg(
-      title: 'คำขอจองใหม่',
-      body: '$orderNo $room $timeRange',
-      time: displayTime,     // << เวลาแสดงตรงนี้
-    );
-  }).toList();
+    // Only pending requests
+    final pendingList = data.where((e) => (e['status'] ?? '') == 'Pending');
 
-  _messages
-    ..clear()
-    ..addAll(msgs);
-}
+    final msgs = pendingList.map<_Msg>((e) {
+      final id = e['id'];
+      final room = (e['room'] ?? '').toString();      // e.g. Room 102
+      final timeRange = (e['time'] ?? '').toString(); // e.g. 1:00 PM - 3:00 PM
 
+      final dateStr = (e['room_date'] ?? '').toString();
+      String displayTime = '-';
 
-void _openInbox() {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (ctx) {
-      return DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        builder: (_, controller) {
-          return Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.black12,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'ข้อความแจ้งเตือน',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
+      final dt = DateTime.tryParse(dateStr);
+      if (dt != null) {
+        final hh = dt.hour.toString().padLeft(2, '0');
+        final mm = dt.minute.toString().padLeft(2, '0');
+        displayTime = '$hh:$mm';
+      } else if (dateStr.length >= 16) {
+        displayTime = dateStr.substring(11, 16);
+      }
 
-              // ✅ ถ้าไม่มีคำขอใหม่ ให้แสดงข้อความแจ้ง
-              Expanded(
-                child: _messages.isEmpty
-                    ? const Center(
-                        child: Text('ยังไม่มีคำขอจองใหม่'),
-                      )
-                    : ListView.separated(
-                        controller: controller,
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                        itemCount: _messages.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) => _MessageTile(msg: _messages[i]),
-                      ),
-              ),
-            ],
-          );
-        },
+      final orderNo = id is int
+          ? 'ORDER${id.toString().padLeft(4, '0')}'
+          : 'ORDER$id';
+
+      return _Msg(
+        title: 'New booking request',
+        body: '$orderNo $room $timeRange',
+        time: displayTime,
       );
-    },
-  );
-}
+    }).toList();
 
+    _messages
+      ..clear()
+      ..addAll(msgs);
+  }
+
+  void _openInbox() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (_, controller) {
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Notifications',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: _messages.isEmpty
+                      ? const Center(
+                          child: Text('No new booking requests yet'),
+                        )
+                      : ListView.separated(
+                          controller: controller,
+                          padding:
+                              const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                          itemCount: _messages.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _MessageTile(msg: _messages[i]),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,9 +299,12 @@ void _openInbox() {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        Text('เกิดข้อผิดพลาด: $_error'),
+                        Text('Error: $_error'),
                         const SizedBox(height: 8),
-                        OutlinedButton(onPressed: _loadAll, child: const Text('ลองอีกครั้ง')),
+                        OutlinedButton(
+                          onPressed: _loadAll,
+                          child: const Text('Try again'),
+                        ),
                       ],
                     ),
                   ),
@@ -315,19 +313,22 @@ void _openInbox() {
                 SliverToBoxAdapter(child: _buildStatsGrid()),
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 4),
                   sliver: SliverList.separated(
                     itemCount: _orders.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (ctx, i) => OrderCard(
                       item: _orders[i],
                       onGo: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ApproveDetailPage(item: _orders[i]),
+                            builder: (_) =>
+                                ApproveDetailPage(item: _orders[i]),
                           ),
-                        ).then((_) => _loadAll()); // กลับมาแล้วรีเฟรช
+                        ).then((_) => _loadAll());
                       },
                     ),
                   ),
@@ -342,7 +343,7 @@ void _openInbox() {
     );
   }
 
-  /// ส่วนหัว QuickRoom + โปรไฟล์ + ปุ่ม Logout
+  /// Header: QuickRoom + profile + inbox + logout
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -382,7 +383,7 @@ void _openInbox() {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // การ์ดโปรไฟล์ (โชว์ข้อมูลจาก DB)
+              // Profile card
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(10),
@@ -390,22 +391,36 @@ void _openInbox() {
                     color: QColors.card,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: const [
-                      BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
+                      BoxShadow(
+                        color: Color(0x12000000),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
                     ],
                   ),
                   child: Row(
                     children: [
                       const CircleAvatar(
                         radius: 22,
-                        backgroundImage: AssetImage('assets/images/avatar_placeholder.png'),
+                        backgroundImage: AssetImage(
+                          'assets/images/avatar_placeholder.png',
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _MiniText(_displayName.isEmpty ? '-' : _displayName, bold: true),
-                            _MiniText.rich('Email : ', _displayEmail.isEmpty ? '-' : _displayEmail),
+                            _MiniText(
+                              _displayName.isEmpty ? '-' : _displayName,
+                              bold: true,
+                            ),
+                            _MiniText.rich(
+                              'Email : ',
+                              _displayEmail.isEmpty
+                                  ? '-'
+                                  : _displayEmail,
+                            ),
                             _MiniText.rich('Role : ', _displayRole),
                           ],
                         ),
@@ -415,7 +430,7 @@ void _openInbox() {
                 ),
               ),
               const SizedBox(width: 12),
-              // ปุ่มจดหมายพร้อม badge
+              // Inbox button with badge
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -426,7 +441,11 @@ void _openInbox() {
                       color: QColors.card,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: const [
-                        BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
+                        BoxShadow(
+                          color: Color(0x12000000),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: IconButton(
@@ -438,7 +457,9 @@ void _openInbox() {
                   Positioned(
                     right: -6,
                     top: -6,
-                    child: _badge('${_messages.length > 99 ? '99+' : _messages.length}'),
+                    child: _badge(
+                      '${_messages.isEmpty ? 0 : (_messages.length > 99 ? '99+' : _messages.length)}',
+                    ),
                   ),
                 ],
               ),
@@ -449,7 +470,7 @@ void _openInbox() {
     );
   }
 
-  /// กล่องสถิติ 2x2 (ใช้ค่าจริงจาก /api/staff/dashboard)
+  /// Stats grid 2x2 (from /api/staff/dashboard)
   Widget _buildStatsGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -464,7 +485,9 @@ void _openInbox() {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Free')),
+                MaterialPageRoute(
+                  builder: (_) => const StatusRoomPage(status: 'Free'),
+                ),
               );
             },
           ),
@@ -475,7 +498,9 @@ void _openInbox() {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Pending')),
+                MaterialPageRoute(
+                  builder: (_) => const StatusRoomPage(status: 'Pending'),
+                ),
               );
             },
           ),
@@ -486,7 +511,9 @@ void _openInbox() {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Reserved')),
+                MaterialPageRoute(
+                  builder: (_) => const StatusRoomPage(status: 'Reserved'),
+                ),
               );
             },
           ),
@@ -497,50 +524,50 @@ void _openInbox() {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StatusRoomPage(status: 'Disabled')),
+                MaterialPageRoute(
+                  builder: (_) => const StatusRoomPage(status: 'Disabled'),
+                ),
               );
             },
           ),
           Align(
-  alignment: Alignment.centerRight,
-  child: Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: SizedBox(
-      width: double.infinity, // ✅ เพิ่มความยาวปุ่ม (ปรับตัวเลขได้ตามใจเลย)
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,      // ✅ พื้นหลังปุ่มสีขาว
-          foregroundColor: Colors.black87,    // ✅ ตัวอักษร + ไอคอนสีดำ
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(
-              width: 1.2,
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(width: 1.2),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RoomBrowserPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.meeting_room_outlined),
+                  label: const Text('Browse Rooms'),
+                ),
+              ),
             ),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 10,
-          ),
-          elevation: 0,
-        ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RoomBrowserPage()),
-          );
-        },
-        icon: const Icon(Icons.meeting_room_outlined),
-        label: const Text('Browse Rooms'),
-      ),
-    ),
-  ),
-)
-
         ],
       ),
     );
   }
-  
 
   /// Bottom Navigation (Main / Approver / History / Profile)
   Widget _buildBottomBar() {
@@ -556,7 +583,11 @@ void _openInbox() {
         color: QColors.primaryRed,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: const [
-          BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -2)),
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 12,
+            offset: Offset(0, -2),
+          ),
         ],
       ),
       child: SafeArea(
@@ -571,17 +602,29 @@ void _openInbox() {
                   setState(() => _currentIndex = i);
                   switch (i) {
                     case 0:
-                      break; // หน้า Home
+                      break; // Home
                     case 1:
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ApprovePage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ApprovePage(),
+                        ),
+                      );
                       break;
                     case 2:
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HistoryPage(),
+                        ),
+                      );
                       break;
                     case 3:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileApproverPage(),
+                        ),
                       );
                       break;
                   }
@@ -591,14 +634,20 @@ void _openInbox() {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(items[i].icon, size: 22, color: active ? QColors.gold : Colors.white),
+                      Icon(
+                        items[i].icon,
+                        size: 22,
+                        color: active ? QColors.gold : Colors.white,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         items[i].label,
                         style: TextStyle(
                           color: active ? QColors.gold : Colors.white,
                           fontSize: 12.5,
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           letterSpacing: 0.2,
                         ),
                       ),
@@ -613,13 +662,19 @@ void _openInbox() {
     );
   }
 
-  /// ===== Widgets ย่อย =====
+  /// ===== Helper widgets =====
   Widget _logoutButton() {
     return Ink(
       decoration: const ShapeDecoration(
         color: QColors.card,
         shape: CircleBorder(),
-        shadows: [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 3))],
+        shadows: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          )
+        ],
       ),
       child: IconButton(
         icon: const Icon(Icons.logout_rounded),
@@ -635,13 +690,20 @@ void _openInbox() {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Logout'),
-        content: const Text('ต้องการออกจากระบบหรือไม่?'),
+        content:
+            const Text('Do you want to log out from the system?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: QColors.primaryRed, foregroundColor: Colors.white),
-            child: const Text('ออกจากระบบ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: QColors.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log out'),
           ),
         ],
       ),
@@ -669,13 +731,17 @@ void _openInbox() {
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
       ),
     );
   }
 }
 
-/// การ์ดสถิติ (กดได้)
+/// Stat card (tapable)
 class StatTile extends StatelessWidget {
   final String title;
   final String value;
@@ -699,12 +765,17 @@ class StatTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             color: QColors.card,
             borderRadius: BorderRadius.circular(14),
             boxShadow: const [
-              BoxShadow(color: Color(0x12000000), blurRadius: 10, offset: Offset(0, 4)),
+              BoxShadow(
+                color: Color(0x12000000),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
             ],
           ),
           child: Row(
@@ -712,7 +783,11 @@ class StatTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 16),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -720,8 +795,18 @@ class StatTile extends StatelessWidget {
                 width: 34,
                 height: 34,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 16)),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ],
           ),
@@ -731,7 +816,7 @@ class StatTile extends StatelessWidget {
   }
 }
 
-/// การ์ดรายการคำสั่งจอง (แสดงเฉพาะ 4 ฟิลด์ที่ต้องการ)
+/// Booking summary card
 class OrderCard extends StatelessWidget {
   final BookingItem item;
   final VoidCallback onGo;
@@ -743,39 +828,61 @@ class OrderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.card,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, 5))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 12,
+            offset: Offset(0, 5),
+          )
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Order number
             Text(
               'Order Number : #${item.id}',
-              style: const TextStyle(fontWeight: FontWeight.w700, color: QColors.text),
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: QColors.text,
+              ),
             ),
             const SizedBox(height: 8),
-            // ห้อง
-            Text('ห้อง : ${item.room}', style: const TextStyle(color: QColors.text)),
+            Text(
+              'Room : ${item.room}',
+              style: const TextStyle(color: QColors.text),
+            ),
             const SizedBox(height: 4),
-            // เวลา
-            Text('เวลา : ${item.time}', style: const TextStyle(color: QColors.text)),
+            Text(
+              'Time : ${item.time}',
+              style: const TextStyle(color: QColors.text),
+            ),
             const SizedBox(height: 4),
-            // ชื่อ User
-            Text('ผู้ขอ : ${item.userName}', style: const TextStyle(color: QColors.text)),
+            Text(
+              'Requested by : ${item.userName}',
+              style: const TextStyle(color: QColors.text),
+            ),
             const SizedBox(height: 12),
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: QColors.primaryRed,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 10,
+                  ),
                   elevation: 0,
                 ),
                 onPressed: onGo,
-                child: const Text('Go', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: const Text(
+                  'Go',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
@@ -785,7 +892,7 @@ class OrderCard extends StatelessWidget {
   }
 }
 
-/// ข้อความย่อยสำหรับการ์ดโปรไฟล์
+/// Small text for profile card
 class _MiniText extends StatelessWidget {
   final String text;
   final bool bold;
@@ -833,7 +940,13 @@ class _MessageTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 3))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          )
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,17 +962,24 @@ class _MessageTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         msg.title,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                     Text(
-                      msg.time,  // 👈 ตอนนี้น่าจะแสดงเช่น "18:59"
-                      style: const TextStyle(color: QColors.muted, fontSize: 12),
+                      msg.time,
+                      style: const TextStyle(
+                        color: QColors.muted,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(msg.body, style: const TextStyle(color: QColors.text)),
+                Text(
+                  msg.body,
+                  style: const TextStyle(color: QColors.text),
+                ),
               ],
             ),
           ),

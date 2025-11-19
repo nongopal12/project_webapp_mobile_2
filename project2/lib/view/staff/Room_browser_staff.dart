@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 /// ===== Backend base URL =====
-const String kBaseUrl = "http://192.168.1.112:3000";
+const String kBaseUrl = "http://192.168.1.123:3000";
 
 /// ===== THEME (โทนสี QuickRoom) =====
 class QColors {
@@ -112,6 +112,8 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         return QColors.reserved;
       case 4:
         return QColors.disabled;
+      case 5:
+        return Colors.grey.shade500; // สี Expired
       default:
         return QColors.text;
     }
@@ -127,6 +129,8 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         return 'Reserved';
       case 4:
         return 'Disabled';
+      case 5: // <= หมดเวลาจอง
+        return 'Expired';
       default:
         return '-';
     }
@@ -516,8 +520,11 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                                         ? Icons.timelapse_rounded
                                         : st == 3
                                         ? Icons.event_busy_rounded
-                                        : Icons.block_rounded,
-                                    size: 11,
+                                        : st == 4
+                                        ? Icons
+                                              .block_rounded // Disabled
+                                        : Icons.schedule_rounded, // <= Expired
+                                    size: 12,
                                     color: color,
                                   ),
                                   const SizedBox(width: 3),

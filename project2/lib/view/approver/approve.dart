@@ -7,11 +7,8 @@ import 'package:project2/view/approver/home.dart';
 import 'package:project2/view/approver/proflie.dart';
 import 'package:project2/view/login.dart';
 
-/// ===== Backend base URL =====
-/// ใส่ IP/Port ให้ตรงกับเครื่องที่รัน Node.js
 const String kBaseUrl = "http://192.168.1.123:3000";
 
-/// ===== Colors =====
 class AColors {
   static const bg = Color(0xFFF7F7F9);
   static const primaryRed = Color(0xFF7A2E22);
@@ -20,14 +17,13 @@ class AColors {
   static const text = Color(0xFF2E2E2E);
 }
 
-/// ===== Model (จาก DB จริง) =====
 class ApproveItem {
-  final int id;           // booking_history.id
-  final String userName;  // ผู้ขอจอง (u.username)
-  final String room;      // "Room 101" ฯลฯ
-  final String date;      // เช่น "1 Nov 2025"
-  final String time;      // "8:00 AM - 10:00 AM"
-  final String reason;    // เหตุผล
+  final int id;
+  final String userName;
+  final String room;
+  final String date;
+  final String time;
+  final String reason;
 
   ApproveItem({
     required this.id,
@@ -60,7 +56,7 @@ class _ApprovePageState extends State<ApprovePage> {
   bool _loading = true;
   String? _error;
   final List<ApproveItem> _items = [];
-  final Set<int> _busyIds = {}; // ป้องกันกดซ้ำต่อรายการ
+  final Set<int> _busyIds = {};
   int _currentIndex = 1;
 
   @override
@@ -69,7 +65,6 @@ class _ApprovePageState extends State<ApprovePage> {
     _loadPending();
   }
 
-  /// ดึง "คำขอค้างอนุมัติ" จาก DB
   Future<void> _loadPending() async {
     setState(() {
       _loading = true;
@@ -80,11 +75,10 @@ class _ApprovePageState extends State<ApprovePage> {
       final uri = Uri.parse('$kBaseUrl/api/staff/history');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
-        throw Exception('โหลดไม่สำเร็จ (${res.statusCode})');
+        throw Exception('Failed to load data (${res.statusCode})');
       }
-      final List data = json.decode(res.body) as List;
 
-      // staff/history คืนรายการทั้งหมด → กรองเอา Pending
+      final List data = json.decode(res.body) as List;
       final pending = data.where((e) => (e['status'] ?? '') == 'Pending');
       final mapped = pending
           .map((e) => ApproveItem.fromHistoryJson(e as Map<String, dynamic>))
@@ -100,17 +94,15 @@ class _ApprovePageState extends State<ApprovePage> {
     }
   }
 
-  /// เรียกอนุมัติ/ปฏิเสธจริงไปที่ backend
   Future<void> _submitDecision(
     ApproveItem it,
     String status, {
-    String? reason, // ตอนนี้ backend ไม่รับ reason; เก็บไว้แสดง UI
+    String? reason,
   }) async {
     if (_busyIds.contains(it.id)) return;
     _busyIds.add(it.id);
     setState(() {});
 
-    // ลบแบบ optimistic
     final idx = _items.indexWhere((x) => x.id == it.id);
     ApproveItem? removed;
     if (idx != -1) {
@@ -118,8 +110,8 @@ class _ApprovePageState extends State<ApprovePage> {
       setState(() {});
     }
 
-    // 2=approve, 3=reject
     final String statusCode = status == 'approved' ? '2' : '3';
+
     try {
       final uri = Uri.parse('$kBaseUrl/api/approver/booking/${it.id}');
       final res = await http.put(
@@ -129,20 +121,18 @@ class _ApprovePageState extends State<ApprovePage> {
       );
 
       if (res.statusCode != 200) {
-        // rollback ถ้า fail
-        if (removed != null) {
-          _items.insert(idx, removed);
-        }
-        throw Exception('อัปเดตไม่สำเร็จ (${res.statusCode})');
+        if (removed != null) _items.insert(idx, removed);
+        throw Exception('Update failed (${res.statusCode})');
       }
 
       final msg = status == 'approved'
-          ? 'อนุมัติคำขอ #${it.id} เรียบร้อย'
-          : 'ปฏิเสธคำขอ #${it.id}'
-              '${(reason != null && reason.trim().isNotEmpty) ? ' (เหตุผล: ${reason.trim()})' : ''}';
+          ? 'Request #${it.id} has been approved.'
+          : 'Request #${it.id} has been rejected'
+              '${(reason != null && reason.trim().isNotEmpty) ? ' (Reason: ${reason.trim()})' : ''}';
+
       _showSnack(msg);
     } catch (e) {
-      _showSnack('ผิดพลาด: $e');
+      _showSnack('Error: $e');
     } finally {
       _busyIds.remove(it.id);
       if (mounted) setState(() {});
@@ -154,11 +144,11 @@ class _ApprovePageState extends State<ApprovePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Logout'),
-        content: const Text('ต้องการออกจากระบบหรือไม่?'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -166,7 +156,7 @@ class _ApprovePageState extends State<ApprovePage> {
               backgroundColor: AColors.primaryRed,
               foregroundColor: Colors.white,
             ),
-            child: const Text('ออกจากระบบ'),
+            child: const Text('Logout'),
           ),
         ],
       ),
@@ -179,34 +169,33 @@ class _ApprovePageState extends State<ApprovePage> {
     }
   }
 
-  /// ยืนยันอนุมัติ
   Future<void> _confirmApprove(ApproveItem it) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการอนุมัติ'),
-        content: Text('ต้องการอนุมัติคำขอ #${it.id} ใช่ไหม?\n'
-            'ห้อง: ${it.room}\nเวลา: ${it.time}\nผู้ขอ: ${it.userName}'),
+        title: const Text('Confirm Approval'),
+        content: Text(
+            'Do you want to approve request #${it.id}?\nRoom: ${it.room}\nTime: ${it.time}\nRequested by: ${it.userName}'),
         actions: [
           TextButton(
+            child: const Text('Cancel'),
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2ECC71),
               foregroundColor: Colors.white,
             ),
-            child: const Text('ยืนยัน'),
+            child: const Text('Approve'),
+            onPressed: () => Navigator.pop(ctx, true),
           ),
         ],
       ),
     );
+
     if (ok == true) await _submitDecision(it, 'approved');
   }
 
-  /// ขอเหตุผลการปฏิเสธ → ส่ง backend เฉพาะ status (ตอนนี้ backend ยังไม่รับ reason)
   Future<void> _promptRejectReason(ApproveItem it) async {
     final ctl = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -215,7 +204,7 @@ class _ApprovePageState extends State<ApprovePage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการไม่อนุมัติ'),
+        title: const Text('Confirm Rejection'),
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -224,16 +213,16 @@ class _ApprovePageState extends State<ApprovePage> {
             maxLines: 3,
             maxLength: 200,
             decoration: const InputDecoration(
-              labelText: 'ระบุเหตุผลการปฏิเสธ',
-              hintText: 'เช่น ขัดกับตารางใช้งาน / เอกสารไม่ครบ / เวลาซ้ำซ้อน',
+              labelText: 'Rejection Reason',
+              hintText: 'e.g., Schedule conflict / Missing document / Time overlap',
               border: OutlineInputBorder(),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) {
-                return 'กรุณากรอกเหตุผล';
+                return 'Please enter a reason';
               }
               if (v.trim().length < 5) {
-                return 'กรุณากรอกอย่างน้อย 5 ตัวอักษร';
+                return 'Please enter at least 5 characters';
               }
               return null;
             },
@@ -242,27 +231,23 @@ class _ApprovePageState extends State<ApprovePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
+              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE74C3C),
               foregroundColor: Colors.white,
             ),
-            child: const Text('ส่งเหตุผล'),
+            child: const Text('Reject'),
           ),
         ],
       ),
     );
 
-    if (ok == true) {
-      await _submitDecision(it, 'rejected', reason: ctl.text);
-    }
+    if (ok == true) await _submitDecision(it, 'rejected', reason: ctl.text);
   }
 
   void _showSnack(String msg) {
@@ -283,24 +268,21 @@ class _ApprovePageState extends State<ApprovePage> {
             slivers: [
               SliverToBoxAdapter(child: SizedBox(height: top * 0.1)),
               SliverToBoxAdapter(child: _buildHeader()),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      'รายการคำขอ (Pending)',
+                      'Pending Requests',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: AColors.primaryRed,
-                        letterSpacing: 0.2,
                       ),
                     ),
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               if (_loading)
                 const SliverToBoxAdapter(
                   child: Padding(
@@ -314,30 +296,20 @@ class _ApprovePageState extends State<ApprovePage> {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        Text('เกิดข้อผิดพลาด: $_error'),
-                        const SizedBox(height: 8),
+                        Text('Error: $_error'),
                         OutlinedButton(
                           onPressed: _loadPending,
-                          child: const Text('ลองอีกครั้ง'),
+                          child: const Text('Try again'),
                         ),
                       ],
                     ),
                   ),
                 )
               else if (_items.isEmpty)
-                SliverToBoxAdapter(
+                const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        const Text('ไม่มีรายการค้างอนุมัติ'),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _loadPending,
-                          child: const Text('รีโหลด'),
-                        ),
-                      ],
-                    ),
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('No pending requests')),
                   ),
                 )
               else
@@ -423,18 +395,12 @@ class _ApprovePageState extends State<ApprovePage> {
       _NavSpec('History', Icons.history),
       _NavSpec('Profile', Icons.person_outline),
     ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: const BoxDecoration(
         color: AColors.primaryRed,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,
@@ -443,7 +409,6 @@ class _ApprovePageState extends State<ApprovePage> {
             final active = _currentIndex == i;
             return Expanded(
               child: InkWell(
-                borderRadius: BorderRadius.circular(16),
                 onTap: () {
                   setState(() => _currentIndex = i);
                   switch (i) {
@@ -454,7 +419,7 @@ class _ApprovePageState extends State<ApprovePage> {
                       );
                       break;
                     case 1:
-                      break; // หน้านี้
+                      break;
                     case 2:
                       Navigator.push(
                         context,
@@ -464,33 +429,26 @@ class _ApprovePageState extends State<ApprovePage> {
                     case 3:
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ProfileApproverPage()),
+                        MaterialPageRoute(
+                            builder: (_) => const ProfileApproverPage()),
                       );
                       break;
                   }
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        items[i].icon,
-                        size: 22,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      items[i].icon,
+                      color: active ? AColors.gold : Colors.white,
+                    ),
+                    Text(
+                      items[i].label,
+                      style: TextStyle(
                         color: active ? AColors.gold : Colors.white,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        items[i].label,
-                        style: TextStyle(
-                          color: active ? AColors.gold : Colors.white,
-                          fontSize: 12.5,
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -501,7 +459,6 @@ class _ApprovePageState extends State<ApprovePage> {
   }
 }
 
-/// ===== Card แสดงรายการอนุมัติ =====
 class _ApproveCard extends StatelessWidget {
   final ApproveItem item;
   final bool busy;
@@ -519,84 +476,63 @@ class _ApproveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: busy ? 0.6 : 1,
-      child: IgnorePointer(
-        ignoring: busy,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AColors.card,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x12000000),
-                blurRadius: 12,
-                offset: Offset(0, 5),
-              ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AColors.card,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 12,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Order Number: #${item.id}",
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 6),
+            Text("Requested by: ${item.userName}"),
+            Text("Room: ${item.room}"),
+            Text("Date: ${item.date}"),
+            Text("Time: ${item.time}"),
+
+            if (item.reason.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text("Reason: ${item.reason}"),
             ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+            const SizedBox(height: 12),
+            Row(
               children: [
-                Text(
-                  'Order Number : #${item.id}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AColors.text,
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2ECC71),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: onApprove,
+                    child: const Text("Approve"),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text('ผู้ขอ : ${item.userName}', style: const TextStyle(color: AColors.text)),
-                const SizedBox(height: 2),
-                Text('ห้อง : ${item.room}', style: const TextStyle(color: AColors.text)),
-                const SizedBox(height: 2),
-                Text('วันที่ : ${item.date}', style: const TextStyle(color: AColors.text)),
-                const SizedBox(height: 2),
-                Text('เวลา : ${item.time}', style: const TextStyle(color: AColors.text)),
-                if (item.reason.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text('เหตุผล : ${item.reason}',
-                      style: TextStyle(color: AColors.text.withOpacity(0.85))),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2ECC71),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                        onPressed: onApprove,
-                        child: const Text('Yes', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE74C3C),
+                      foregroundColor: Colors.white,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE74C3C),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                        onPressed: onReject,
-                        child: const Text('No', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
+                    onPressed: onReject,
+                    child: const Text("Reject"),
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );

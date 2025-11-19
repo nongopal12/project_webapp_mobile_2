@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 /// ===== Backend base URL =====
 const String kBaseUrl = "http://192.168.1.123:3000";
 
-/// ===== THEME (โทนสี QuickRoom) =====
+/// ===== THEME (QuickRoom tone) =====
 class QColors {
   static const Color bg = Color(0xFFF7F7F9);
   static const Color primaryRed = Color(0xFF7A2E22);
@@ -14,7 +14,7 @@ class QColors {
   static const Color text = Color(0xFF2E2E2E);
   static const Color free = Color(0xFF2ECC71);
   static const Color pending = Color(0xFFF4B400);
-  static const reserved = Color(0xFFE74C3C);
+  static const Color reserved = Color(0xFFE74C3C);
   static const Color disabled = Color(0xFFB0B3B8);
 }
 
@@ -24,7 +24,7 @@ class RoomRow {
   final int roomNumber;
   final int roomLocation;
   final int capacity;
-  final String imagePath;  // เช่น "Meeting-RoomA.jpg"
+  final String imagePath; // e.g. "Meeting-RoomA.jpg"
   final DateTime date;
   final int s8;
   final int s10;
@@ -51,7 +51,9 @@ class RoomRow {
       roomLocation: j['room_location'] as int,
       capacity: j['room_capacity'] as int,
       imagePath: (j['room_img'] ?? '').toString(),
-      date: DateTime.tryParse((j['room_date'] ?? '').toString()) ?? DateTime.now(),
+      date:
+          DateTime.tryParse((j['room_date'] ?? '').toString()) ??
+          DateTime.now(),
       s8: j['room_8AM'] as int,
       s10: j['room_10AM'] as int,
       s13: j['room_1PM'] as int,
@@ -60,9 +62,10 @@ class RoomRow {
   }
 }
 
-/// ===== Page: Room Browser (ตารางเวลาห้อง) =====
+/// ===== Page: Room Browser (room timetable) =====
 class RoomBrowserPage extends StatefulWidget {
   const RoomBrowserPage({super.key});
+
   @override
   State<RoomBrowserPage> createState() => _RoomBrowserPageState();
 }
@@ -87,7 +90,7 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
       final uri = Uri.parse('$kBaseUrl/api/rooms');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
-        throw Exception('โหลดข้อมูลห้องไม่สำเร็จ (${res.statusCode})');
+        throw Exception('Failed to load rooms (${res.statusCode})');
       }
       final list = (json.decode(res.body) as List)
           .map((e) => RoomRow.fromJson(e as Map<String, dynamic>))
@@ -110,6 +113,8 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         return QColors.reserved;
       case 4:
         return QColors.disabled;
+      case 5:
+        return Colors.grey.shade500; // สี Expired
       default:
         return QColors.text;
     }
@@ -125,6 +130,8 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         return 'Reserved';
       case 4:
         return 'Disabled';
+      case 5: // <= หมดเวลาจอง
+        return 'Expired';
       default:
         return '-';
     }
@@ -143,27 +150,24 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
-          IconButton(
-            onPressed: _loadRooms,
-            icon: const Icon(Icons.refresh),
-          ),
+          IconButton(onPressed: _loadRooms, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _errorView()
-              : RefreshIndicator(
-                  onRefresh: _loadRooms,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                    children: [
-                      _legend(),
-                      const SizedBox(height: 12),
-                      ..._rooms.map((r) => _roomCard(r)),
-                    ],
-                  ),
-                ),
+          ? _errorView()
+          : RefreshIndicator(
+              onRefresh: _loadRooms,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                children: [
+                  _legend(),
+                  const SizedBox(height: 12),
+                  ..._rooms.map((r) => _roomCard(r)),
+                ],
+              ),
+            ),
     );
   }
 
@@ -174,11 +178,11 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('เกิดข้อผิดพลาด:\n$_error', textAlign: TextAlign.center),
+            Text('An error occurred:\n$_error', textAlign: TextAlign.center),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: _loadRooms,
-              child: const Text('ลองอีกครั้ง'),
+              child: const Text('Try again'),
             ),
           ],
         ),
@@ -186,64 +190,67 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
     );
   }
 
-  /// Legend
+  /// Legend (status pills)
   Widget _legend() {
     Widget pill(Color c, String t) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: c.withOpacity(.08),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: c.withOpacity(.6), width: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.withOpacity(.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.withOpacity(.6), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: c, shape: BoxShape.circle),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: c,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
+          const SizedBox(width: 6),
+          Text(
+            t,
+            style: TextStyle(
+              color: c,
+              fontWeight: FontWeight.w700,
+              fontSize: 12.5,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: QColors.card,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.info_outline, size: 16, color: QColors.primaryRed),
+              SizedBox(width: 6),
               Text(
-                t,
+                'Room Status',
                 style: TextStyle(
-                  color: c,
                   fontWeight: FontWeight.w700,
-                  fontSize: 12.5,
+                  color: QColors.text,
+                  fontSize: 14,
                 ),
               ),
             ],
           ),
-        );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: QColors.card,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x11000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, size: 18, color: QColors.primaryRed),
-          const SizedBox(width: 8),
-          const Text(
-            'Room Status',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: QColors.text,
-            ),
-          ),
-          const Spacer(),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -259,14 +266,14 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
     );
   }
 
-  /// Card ต่อห้อง + slot 4 ช่อง + "รูปภาพห้อง"
+  /// Card per room + 4 time slots + room image
   Widget _roomCard(RoomRow r) {
     final roomName = 'Room ${r.roomLocation}0${r.roomNumber}';
     final slots = [r.s8, r.s10, r.s13, r.s15];
     final dateText =
         '${r.date.day.toString().padLeft(2, '0')}/${r.date.month.toString().padLeft(2, '0')}/${r.date.year}';
 
-    // path รูปจาก assets (แก้ให้ตรงกับโปรเจกต์ของคุณได้)
+    // image asset path (adjust to your project if needed)
     final imgPath = 'assets/images/${r.imagePath}';
 
     return Container(
@@ -293,11 +300,11 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ===== แถวบน: รูปห้อง + ข้อมูลห้อง =====
+              // ===== Top row: image + room info =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // รูปห้อง
+                  // Room image
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Image.asset(
@@ -305,7 +312,7 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                       width: 96,
                       height: 82,
                       fit: BoxFit.cover,
-                      // กันกรณีรูปไม่มีใน assets
+                      // Fallback if asset not found
                       errorBuilder: (ctx, err, stack) {
                         return Container(
                           width: 96,
@@ -322,12 +329,12 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // ข้อมูลห้อง
+                  // Room info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // header row
+                        // Header row
                         Row(
                           children: [
                             Expanded(
@@ -341,7 +348,10 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: QColors.primaryRed.withOpacity(.06),
                                 borderRadius: BorderRadius.circular(999),
@@ -353,8 +363,11 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.stairs_rounded,
-                                      size: 14, color: QColors.primaryRed),
+                                  const Icon(
+                                    Icons.stairs_rounded,
+                                    size: 14,
+                                    color: QColors.primaryRed,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Floor ${r.roomLocation}',
@@ -370,13 +383,16 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        // sub info
+                        // Sub info: capacity + date
                         Row(
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.people_alt_rounded,
-                                    size: 16, color: QColors.text.withOpacity(.7)),
+                                Icon(
+                                  Icons.people_alt_rounded,
+                                  size: 16,
+                                  color: QColors.text.withOpacity(.7),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Cap ${r.capacity}',
@@ -390,8 +406,11 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                             const SizedBox(width: 12),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded,
-                                    size: 14, color: QColors.text.withOpacity(.7)),
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 14,
+                                  color: QColors.text.withOpacity(.7),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   dateText,
@@ -425,19 +444,25 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
               ),
               const SizedBox(height: 10),
 
-              // ===== ตาราง time slot 4 ช่อง =====
+              // ===== Time-slot row (4 slots) =====
               Row(
                 children: List.generate(4, (i) {
                   final st = slots[i];
                   final color = _statusColor(st);
                   return Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
                       margin: EdgeInsets.only(right: i == 3 ? 0 : 8),
                       decoration: BoxDecoration(
                         color: color.withOpacity(.07),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: color.withOpacity(.55), width: 0.9),
+                        border: Border.all(
+                          color: color.withOpacity(.55),
+                          width: 0.9,
+                        ),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -455,11 +480,17 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                           ),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: color.withOpacity(.5), width: 0.7),
+                              border: Border.all(
+                                color: color.withOpacity(.5),
+                                width: 0.7,
+                              ),
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
@@ -470,10 +501,13 @@ class _RoomBrowserPageState extends State<RoomBrowserPage> {
                                     st == 1
                                         ? Icons.check_circle_rounded
                                         : st == 2
-                                            ? Icons.timelapse_rounded
-                                            : st == 3
-                                                ? Icons.event_busy_rounded
-                                                : Icons.block_rounded,
+                                        ? Icons.timelapse_rounded
+                                        : st == 3
+                                        ? Icons.event_busy_rounded
+                                        : st == 4
+                                        ? Icons
+                                              .block_rounded // Disabled
+                                        : Icons.schedule_rounded, // <= Expired
                                     size: 12,
                                     color: color,
                                   ),

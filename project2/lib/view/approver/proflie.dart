@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:project2/view/approver/home.dart';
 import 'package:project2/view/approver/approve.dart';
 import 'package:project2/view/approver/history_approver.dart';
 import 'package:project2/view/login.dart';
 
-const String kBaseUrl = "http://192.168.1.123:3000"; // แก้ให้ตรง backend
+const String kBaseUrl = "http://192.168.1.123:3000"; // Match your backend base URL
 
 class PColors {
   static const bg = Color(0xFFF7F7F9);
@@ -19,6 +20,7 @@ class PColors {
 
 class ProfileApproverPage extends StatefulWidget {
   const ProfileApproverPage({super.key});
+
   @override
   State<ProfileApproverPage> createState() => _ProfileApproverPageState();
 }
@@ -45,7 +47,11 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
       final username = sp.getString('username') ?? 'admin';
       final uri = Uri.parse('$kBaseUrl/api/profile/$username');
       final res = await http.get(uri);
-      if (res.statusCode != 200) throw Exception('โหลดโปรไฟล์ไม่สำเร็จ');
+
+      if (res.statusCode != 200) {
+        throw Exception('Failed to load profile');
+      }
+
       final data = json.decode(res.body);
       _userId = int.tryParse('${data['id'] ?? data['user_id'] ?? ''}');
       _username = (data['username'] ?? '').toString();
@@ -58,27 +64,111 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
     }
   }
 
+  // 🔹 เพิ่มฟังก์ชัน Logout แบบเดียวกับ Staff
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PColors.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final sp = await SharedPreferences.getInstance();
+      await sp.remove('username'); // เคลียร์ username เก่า (ถ้าเก็บไว้)
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out successfully.')),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PColors.bg,
+
+      // 🔹 AppBar พร้อมปุ่ม Logout เหมือน Staff
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        elevation: 1,
+        title: const Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Quick',
+                style: TextStyle(
+                  color: PColors.gold,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextSpan(
+                text: 'Room',
+                style: TextStyle(
+                  color: PColors.primaryRed,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const CircleAvatar(
+              backgroundColor: Colors.transparent,
+              child: Icon(Icons.exit_to_app, color: PColors.primaryRed, size: 24),
+            ),
+            onPressed: _confirmLogout,
+          ),
+          const SizedBox(width: 10),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(color: Colors.grey[300], height: 1.0),
+        ),
+      ),
+
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-            ? Center(child: Text('ผิดพลาด: $_error'))
-            : Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: EmployeeIdCardHorizontal(
-                    name: _username.isEmpty ? '-' : _username,
-                    role: _role,
-                    employeeId: _userId == null ? '-' : '#${_userId!}',
-                    email: _email,
-                    department: 'QuickRoom System',
+                ? Center(child: Text('Error: $_error'))
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: EmployeeIdCardHorizontal(
+                        name: _username.isEmpty ? '-' : _username,
+                        role: _role,
+                        employeeId: _userId == null ? '-' : '#${_userId!}',
+                        email: _email,
+                        department: 'QuickRoom System',
+                      ),
+                    ),
                   ),
-                ),
-              ),
       ),
       bottomNavigationBar: _buildBottomBar(context),
     );
@@ -134,6 +224,7 @@ class _ProfileApproverPageState extends State<ProfileApproverPage> {
                       );
                       break;
                     case 3:
+                      // Already on Profile
                       break;
                   }
                 },
@@ -171,13 +262,14 @@ class _NavSpec {
   const _NavSpec(this.label, this.icon);
 }
 
-/// ===== บัตรพนักงานแนวนอน (ไม่มีรูป) =====
+/// ===== Horizontal Employee ID Card (no photo file, just icon) =====
 class EmployeeIdCardHorizontal extends StatelessWidget {
   final String name;
   final String role;
   final String employeeId;
   final String department;
   final String email;
+
   const EmployeeIdCardHorizontal({
     super.key,
     required this.name,
@@ -213,7 +305,7 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // แถบทองด้านบน
+          // Top gold bar
           Positioned(
             top: 0,
             left: 0,
@@ -235,7 +327,7 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
             ),
           ),
 
-          // เนื้อใน
+          // Content
           Positioned.fill(
             top: 42,
             child: Padding(
@@ -243,7 +335,7 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // ช่องซ้าย (แทนรูป)
+                  // Left (avatar box)
                   Container(
                     width: 100,
                     height: 120,
@@ -264,7 +356,7 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
 
-                  // ช่องขวา (ข้อมูล)
+                  // Right (info)
                   Expanded(
                     child: DefaultTextStyle(
                       style: const TextStyle(color: Colors.white),
@@ -309,7 +401,7 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
             ),
           ),
 
-          // มุมล่างขวา
+          // Bottom right employee ID
           Positioned(
             right: 14,
             bottom: 8,
@@ -328,28 +420,28 @@ class EmployeeIdCardHorizontal extends StatelessWidget {
   }
 
   Widget _kv(String k, String v) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            '$k :',
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 12.5,
-              color: Colors.white,
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(
+                '$k :',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  color: Colors.white,
+                ),
+              ),
             ),
-          ),
+            Expanded(
+              child: Text(
+                v,
+                style: const TextStyle(fontSize: 12.5),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: Text(
-            v,
-            style: const TextStyle(fontSize: 12.5),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    ),
-  );
+      );
 }

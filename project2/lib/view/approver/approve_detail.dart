@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-// เอา QColors + BookingItem จาก home.dart
+// Use QColors + BookingItem from home.dart
 import 'home.dart';
 
 const String kBaseUrl = "http://192.168.1.123:3000";
@@ -18,7 +18,7 @@ class ApproveDetailPage extends StatefulWidget {
 class _ApproveDetailPageState extends State<ApproveDetailPage> {
   bool _busy = false;
 
-  /// ====== ยิง API อัปเดตสถานะ (2=approve, 3=reject) ======
+  /// ====== Call API to update status (2 = approve, 3 = reject) ======
   Future<void> _updateStatus(String statusCode, {String? reason}) async {
     setState(() => _busy = true);
     try {
@@ -29,48 +29,48 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
         body: jsonEncode({'status': statusCode}),
       );
       if (res.statusCode != 200) {
-        throw Exception('อัปเดตไม่สำเร็จ (${res.statusCode})');
+        throw Exception('Update failed (${res.statusCode})');
       }
 
       if (!mounted) return;
 
       final msg = statusCode == "2"
-          ? 'อนุมัติคำขอ #${widget.item.id} สำเร็จ'
-          : 'ปฏิเสธคำขอ #${widget.item.id}'
-              '${(reason != null && reason.trim().isNotEmpty) ? ' (เหตุผล: ${reason.trim()})' : ''}';
+          ? 'Request #${widget.item.id} has been approved.'
+          : 'Request #${widget.item.id} has been rejected'
+              '${(reason != null && reason.trim().isNotEmpty) ? ' (Reason: ${reason.trim()})' : ''}';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
       );
 
-      Navigator.pop(context, true); // กลับหน้าเดิม
+      Navigator.pop(context, true); // go back to previous page
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ผิดพลาด: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// ====== ยืนยันอนุมัติ แบบหน้า approve.dart ======
+  /// ====== Confirm approve (same logic as approve.dart) ======
   Future<void> _confirmApprove() async {
     final it = widget.item;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการอนุมัติ'),
+        title: const Text('Confirm Approval'),
         content: Text(
-          'ต้องการอนุมัติคำขอ #${it.id} ใช่ไหม?\n'
-          'ห้อง: ${it.room}\n'
-          'เวลา: ${it.time}\n'
-          'ผู้ขอ: ${it.userName}',
+          'Do you want to approve request #${it.id}?\n'
+          'Room: ${it.room}\n'
+          'Time: ${it.time}\n'
+          'Requested by: ${it.userName}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -78,7 +78,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
               backgroundColor: const Color(0xFF2ECC71),
               foregroundColor: Colors.white,
             ),
-            child: const Text('ยืนยัน'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -88,7 +88,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
     }
   }
 
-  /// ====== ปฏิเสธ: บังคับกรอกเหตุผลทุกครั้ง ======
+  /// ====== Reject: always require a reason ======
   Future<void> _promptRejectReason() async {
     final it = widget.item;
     final ctl = TextEditingController();
@@ -98,17 +98,17 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการไม่อนุมัติ'),
+        title: const Text('Confirm Rejection'),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'ต้องการปฏิเสธคำขอ #${it.id} ใช่ไหม?\n'
-                'ห้อง: ${it.room}\n'
-                'เวลา: ${it.time}\n'
-                'ผู้ขอ: ${it.userName}',
+                'Do you want to reject request #${it.id}?\n'
+                'Room: ${it.room}\n'
+                'Time: ${it.time}\n'
+                'Requested by: ${it.userName}',
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -117,16 +117,17 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                 maxLines: 3,
                 maxLength: 200,
                 decoration: const InputDecoration(
-                  labelText: 'เหตุผลการปฏิเสธ',
-                  hintText: 'เช่น ขัดกับตารางใช้งาน / เอกสารไม่ครบ',
+                  labelText: 'Rejection reason',
+                  hintText:
+                      'e.g., schedule conflict / incomplete documents / overlapping usage',
                   border: OutlineInputBorder(),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'กรุณากรอกเหตุผล';
+                    return 'Please enter a reason';
                   }
                   if (v.trim().length < 5) {
-                    return 'กรุณากรอกอย่างน้อย 5 ตัวอักษร';
+                    return 'Please enter at least 5 characters';
                   }
                   return null;
                 },
@@ -137,7 +138,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -149,7 +150,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
               backgroundColor: const Color(0xFFE74C3C),
               foregroundColor: Colors.white,
             ),
-            child: const Text('ส่งเหตุผล'),
+            child: const Text('Submit Reason'),
           ),
         ],
       ),
@@ -163,12 +164,12 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
   @override
   Widget build(BuildContext context) {
     final it = widget.item;
-    // ✅ รูปมาจาก DB: room_img เก็บเป็นชื่อไฟล์ เช่น "Meeting-RoomA.jpg"
+    // Image from DB: room_img stores a file name e.g., "Meeting-RoomA.jpg"
     final imgUrl = '$kBaseUrl/assets/${it.imagePath}';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('รายละเอียดคำขอ'),
+        title: const Text('Request Details'),
         backgroundColor: QColors.primaryRed,
         foregroundColor: Colors.white,
       ),
@@ -190,9 +191,10 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /// ====== รูปภาพห้องด้านบน (จาก DB) ======
+              /// ====== Room image at the top (from DB) ======
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.network(
@@ -213,7 +215,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
 
               const SizedBox(height: 16),
 
-              /// ====== ข้อมูลคำขอ ======
+              /// ====== Request information ======
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -221,18 +223,18 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                   children: [
                     _row('Order Number', '#${it.id}'),
                     const SizedBox(height: 8),
-                    _row('ห้อง', it.room),
+                    _row('Room', it.room),
                     const SizedBox(height: 8),
-                    _row('เวลา', it.time),
+                    _row('Time', it.time),
                     const SizedBox(height: 8),
-                    _row('ชื่อผู้ขอ', it.userName),
+                    _row('Requested by', it.userName),
                   ],
                 ),
               ),
 
               const Spacer(),
 
-              /// ====== ปุ่มอนุมัติ / ปฏิเสธ ======
+              /// ====== Approve / Reject buttons ======
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Row(
@@ -258,7 +260,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                                 ),
                               )
                             : const Text(
-                                'อนุมัติ',
+                                'Approve',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
@@ -285,7 +287,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                                 ),
                               )
                             : const Text(
-                                'ปฏิเสธ',
+                                'Reject',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
