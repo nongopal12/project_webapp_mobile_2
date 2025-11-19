@@ -196,7 +196,13 @@ app.get("/api/rooms", (req, res) => {
       }
 
       // STEP 3: ดึงข้อมูลห้องหลังจากอัปเดตแล้วส่งให้ Flutter
-      const selectSql = "SELECT * FROM booking WHERE DATE(room_date) = ?";
+      const selectSql = `
+  SELECT *
+  FROM booking
+  WHERE DATE(room_date) = ?
+  ORDER BY room_location ASC, room_number ASC
+`;
+
       con.query(selectSql, [today], (errSelect, results) => {
         if (errSelect) {
           console.error("❌ Error fetching rooms:", errSelect);
@@ -229,29 +235,28 @@ app.post("/api/book", (req, res) => {
     return res.status(400).json({ message: "Invalid time slot" });
   }
 
-  // 🧠 Step 1: Check if the user already has a booking today
-  const today = moment().format("YYYY-MM-DD");
+  // 🧠 Step 1: Check if THIS USER already made a booking today
   const checkUserSql = `
     SELECT COUNT(*) AS total
     FROM booking_history
-    WHERE user_id = ? AND DATE(room_date) = ?
+    WHERE user_id = ?
+      AND DATE(room_date) = CURDATE()
+      AND status IN ('1', '2')   -- 1 = Pending, 2 = Approved
   `;
-  con.query(checkUserSql, [user_id, today], (err, rows) => {
+
+  con.query(checkUserSql, [user_id], (err, rows) => {
     if (err) {
       console.error("❌ Error checking user bookings:", err);
       return res.status(500).json({ message: "Database error" });
     }
 
     if (rows[0].total > 0) {
-      // User already booked today
       return res
         .status(400)
-        .json(
-          "You already booked a room today. Only one booking per day is allowed."
-        );
+        .json("You already booked a room today. Only one booking per day is allowed.");
     }
 
-    // 🧠 Step 2: Check if this room/time slot is available
+    // 🧠 Step 2: Check if the slot is still available
     con.query(
       `SELECT ${column} FROM booking WHERE room_id = ?`,
       [room_id],
@@ -280,36 +285,33 @@ app.post("/api/book", (req, res) => {
               return res.status(500).json({ message: "Update failed" });
             }
 
-            // 🧠 Step 4: Record booking history
+            // 🧠 Step 4: Insert booking into booking_history
             const insertSql = `
               INSERT INTO booking_history 
               (user_id, room_number, room_date, room_time, reason, status, approver_by)
-                VALUES 
-              (?, ?, NOW(), ?, ?, '1', 0)
-                `;
-            con.query(
-              insertSql,
-              [user_id, room_id, time_slot, reason],
-              (err4) => {
-                if (err4) {
-                  console.error("❌ Error inserting history:", err4);
-                  return res.status(500).json({ message: "Insert failed" });
-                }
+              VALUES (?, ?, NOW(), ?, ?, '1', 0)
+            `;
 
-                console.log(
-                  `✅ Booking created by user ${user_id} for room ${room_id}`
-                );
-                return res.json({
-                  message: "Booking request submitted successfully",
-                });
+            con.query(insertSql, [user_id, room_id, time_slot, reason], (err4) => {
+              if (err4) {
+                console.error("❌ Error inserting history:", err4);
+                return res.status(500).json({ message: "Insert failed" });
               }
-            );
+
+              console.log(
+                `✅ Booking created by user ${user_id} for room ${room_id}`
+              );
+              return res.json({
+                message: "Booking request submitted successfully",
+              });
+            });
           }
         );
       }
     );
   });
 });
+
 
 ////////////////////////////////////////////////// USER from jack //////////////////////////////////////////////////
 
@@ -617,6 +619,7 @@ app.post("/api/staff/rooms", (req, res) => {
     );
   });
 });
+
 
 // ====================  Edit Room Staff ===================== //
 app.put("/api/staff/rooms/:id", (req, res) => {
@@ -949,3 +952,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+

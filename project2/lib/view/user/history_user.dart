@@ -6,7 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project2/view/login.dart';
 import 'checkstatus.dart';
 import 'booking_room.dart';
-import 'package:project2/view/login.dart'; // ใช้ AuthApi
+
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -19,7 +27,6 @@ class _HistoryPageState extends State<HistoryPage> {
   List<dynamic> bookingHistory = [];
   bool _loading = true;
 
-  // ✅ ใช้ baseUrl เดียวกับ login
   final String baseUrl = AuthApi().baseUrl;
 
   @override
@@ -32,9 +39,8 @@ class _HistoryPageState extends State<HistoryPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       int? userId = prefs.getInt('uid');
-      String? token = prefs.getString('token'); // ถ้ายังไม่มี JWT ก็จะเป็น null
+      String? token = prefs.getString('token');
 
-      // ❗ ถ้าไม่รู้ว่า user ไหนจริง ๆ ค่อยเด้งกลับ login
       if (userId == null) {
         setState(() => _loading = false);
         if (mounted) {
@@ -76,7 +82,6 @@ class _HistoryPageState extends State<HistoryPage> {
           _loading = false;
         });
       } else if (response.statusCode == 401) {
-        // กรณี backend บังคับ JWT แล้ว token ไม่ถูกต้อง
         setState(() => _loading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -99,6 +104,13 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  Future<void> _refreshHistory() async {
+    setState(() {
+      _loading = true;
+    });
+    await _fetchHistory();
+  }
+
   void _logout(BuildContext context) {
     showDialog(
       context: context,
@@ -113,7 +125,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF883C31),
+              backgroundColor: SColors.primaryRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
@@ -152,11 +164,11 @@ class _HistoryPageState extends State<HistoryPage> {
   Color _statusColor(String code) {
     switch (code) {
       case '1':
-        return const Color(0xFFE6D60A);
+        return Colors.orange;
       case '2':
-        return const Color(0xFF4CAF50);
+        return Colors.green;
       case '3':
-        return const Color(0xFFF44336);
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -193,25 +205,77 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: SColors.bg, // 🔥 พื้นหลังสีเทาอ่อน
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        automaticallyImplyLeading: false,
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(
+                text: 'Quick',
+                style: TextStyle(color: SColors.gold),
+              ),
+              TextSpan(
+                text: 'Room',
+                style: TextStyle(color: SColors.primaryRed),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: CircleAvatar(
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(
+                Icons.exit_to_app,
+                color: SColors.primaryRed,
+                size: 24,
+              ),
+            ),
+            onPressed: () => _logout(context),
+          ),
+          const SizedBox(width: 10),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey[300], height: 1),
+        ),
+      ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : bookingHistory.isEmpty
-            ? const Center(child: Text("No approved or rejected history"))
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: _refreshHistory,
+          color: SColors.primaryRed,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : bookingHistory.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        "No approved or rejected history",
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     const Text(
                       'Booking History',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: SColors.text,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     ...bookingHistory.map((item) {
                       final statusCode = item['status'].toString();
                       final statusText = _statusText(statusCode);
@@ -223,94 +287,139 @@ class _HistoryPageState extends State<HistoryPage> {
                           .trim();
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 18),
-                        padding: const EdgeInsets.all(18),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEAE7E6),
-                          borderRadius: BorderRadius.circular(12),
+                          color: SColors.card, // 🔥 การ์ดสีขาว
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x12000000),
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _infoRow(
-                              Icons.location_on,
-                              'Room: ${item['room_number']} (Floor ${item['room_location']})',
-                            ),
-                            const SizedBox(height: 8),
-                            _infoRow(
-                              Icons.calendar_today,
-                              'Date: ${item['room_date'].toString().replaceAll("T", " ").replaceAll("Z", "")}',
-                            ),
-                            const SizedBox(height: 8),
-                            _infoRow(
-                              Icons.access_time,
-                              'Time: ${_timeSlot(item['room_time'])}',
-                            ),
-                            const SizedBox(height: 8),
-                            _infoRow(Icons.notes, 'Reason: ${item['reason']}'),
-                            const SizedBox(height: 8),
-                            _infoRow(
-                              Icons.person,
-                              'Booked by: ${item['booked_by'] ?? 'Unknown'}',
-                            ),
-                            const SizedBox(height: 8),
-                            _infoRow(
-                              Icons.verified_user,
-                              'Approved by: ${item['approver_name'] ?? 'Unknown'}',
-                            ),
-
-                            // ✅ ถ้าโดน Reject และมีเหตุผล ให้แสดง
-                            if (statusCode == '3' &&
-                                rejectComment.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              _infoRow(
-                                Icons.feedback,
-                                'Reject reason: $rejectComment',
-                              ),
-                            ],
-
-                            const SizedBox(height: 8),
+                            // 🔥 Header with Status Badge
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Icon(statusIcon, color: statusColor, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  statusText,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.black87,
+                                Expanded(
+                                  child: Text(
+                                    'Room ${item['room_number']}',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: SColors.text,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        statusIcon,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        statusText,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  statusText,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                            const SizedBox(height: 12),
+
+                            _infoRow(
+                              Icons.location_on,
+                              'Floor ${item['room_location']}',
+                            ),
+                            const SizedBox(height: 6),
+                            _infoRow(
+                              Icons.calendar_today,
+                              'Date: ${item['room_date'].toString().split('T')[0]}',
+                            ),
+                            const SizedBox(height: 6),
+                            _infoRow(
+                              Icons.access_time,
+                              'Time: ${_timeSlot(item['room_time'])}',
+                            ),
+                            const SizedBox(height: 6),
+                            _infoRow(
+                              Icons.person,
+                              'Booked by: ${item['booked_by'] ?? 'Unknown'}',
+                            ),
+                            const SizedBox(height: 6),
+                            _infoRow(
+                              Icons.verified_user,
+                              'Approved by: ${item['approver_name'] ?? 'Unknown'}',
+                            ),
+                            const SizedBox(height: 6),
+                            _infoRow(Icons.notes, 'Reason: ${item['reason']}'),
+
+                            // 🔥 Reject reason (เฉพาะ Reject)
+                            if (statusCode == '3' && rejectComment.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.feedback,
+                                        size: 18,
+                                        color: Colors.red.shade700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "Reject reason: $rejectComment",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.red.shade900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       );
                     }).toList(),
                   ],
                 ),
-              ),
+        ),
       ),
       bottomNavigationBar: _bottomNavBar(),
     );
@@ -320,12 +429,12 @@ class _HistoryPageState extends State<HistoryPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: Colors.brown, size: 20),
-        const SizedBox(width: 10),
+        Icon(icon, color: SColors.primaryRed, size: 18),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 15, color: Colors.black87),
+            style: const TextStyle(fontSize: 15, color: SColors.text),
           ),
         ),
       ],
@@ -333,9 +442,8 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _bottomNavBar() {
-    const brown = Color(0xFF6B2E1E);
     return Container(
-      color: brown,
+      color: SColors.primaryRed, // 🔥 สีแดง
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: SafeArea(
         top: false,
@@ -357,7 +465,7 @@ class _HistoryPageState extends State<HistoryPage> {
               icon: Icons.edit_note,
               label: 'Check Status',
               onTap: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (_) => const CheckStatusPage()),
                 );

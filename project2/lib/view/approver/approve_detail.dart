@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-// Use QColors + BookingItem from home.dart
 import 'home.dart';
 
 const String kBaseUrl = "http://192.168.1.123:3000";
@@ -18,77 +18,97 @@ class ApproveDetailPage extends StatefulWidget {
 class _ApproveDetailPageState extends State<ApproveDetailPage> {
   bool _busy = false;
 
-  /// ====== Call API to update status (2 = approve, 3 = reject) ======
+  /// ========================================================
+  ///  UPDATE STATUS API (ส่ง approver_id + reason)
+  /// ========================================================
   Future<void> _updateStatus(String statusCode, {String? reason}) async {
     setState(() => _busy = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final approverId = prefs.getInt("uid"); // 👈 สำคัญมาก ต้องมี!!
+
+      if (approverId == null) {
+        throw Exception("Approver ID not found (uid is null).");
+      }
+
       final uri = Uri.parse('$kBaseUrl/api/approver/booking/${widget.item.id}');
+
+      final body = {
+        'status': statusCode,
+        'approver_id': approverId, // 👈 ส่งคนอนุมัติจริง!!
+        'reject_reason': reason ?? "", // ส่งเหตุผล (ถ้าปฏิเสธ)
+      };
+
       final res = await http.put(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'status': statusCode}),
+        body: jsonEncode(body),
       );
+
       if (res.statusCode != 200) {
-        throw Exception('Update failed (${res.statusCode})');
+        throw Exception('Update failed (${res.statusCode}) → ${res.body}');
       }
 
       if (!mounted) return;
 
       final msg = statusCode == "2"
-          ? 'Request #${widget.item.id} has been approved.'
-          : 'Request #${widget.item.id} has been rejected'
-              '${(reason != null && reason.trim().isNotEmpty) ? ' (Reason: ${reason.trim()})' : ''}';
+          ? "Request #${widget.item.id} approved."
+          : "Request #${widget.item.id} rejected${(reason != null) ? " (Reason: $reason)" : ""}";
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-      Navigator.pop(context, true); // go back to previous page
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// ====== Confirm approve (same logic as approve.dart) ======
+  /// ========================================================
+  ///  APPROVE CONFIRMATION
+  /// ========================================================
   Future<void> _confirmApprove() async {
     final it = widget.item;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Approval'),
+        title: const Text("Confirm Approval"),
         content: Text(
-          'Do you want to approve request #${it.id}?\n'
-          'Room: ${it.room}\n'
-          'Time: ${it.time}\n'
-          'Requested by: ${it.userName}',
+          "Do you want to approve this request?\n"
+          "Room: ${it.room}\n"
+          "Time : ${it.time}\n"
+          "Requested by: ${it.userName}",
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2ECC71),
+              backgroundColor: Color(0xFF2ECC71),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Confirm'),
+            child: const Text("Approve"),
           ),
         ],
       ),
     );
+
     if (ok == true) {
-      await _updateStatus("2");
+      await _updateStatus("2"); // Approve
     }
   }
 
-  /// ====== Reject: always require a reason ======
+  /// ========================================================
+  ///  REJECT WITH REASON
+  /// ========================================================
   Future<void> _promptRejectReason() async {
     final it = widget.item;
     final ctl = TextEditingController();
@@ -98,36 +118,33 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Rejection'),
+        title: const Text("Reject Request"),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Do you want to reject request #${it.id}?\n'
-                'Room: ${it.room}\n'
-                'Time: ${it.time}\n'
-                'Requested by: ${it.userName}',
+                "Reject request #${it.id}?\n"
+                "Room: ${it.room}\n"
+                "Time : ${it.time}\n"
+                "Requested by: ${it.userName}",
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: ctl,
-                autofocus: true,
                 maxLines: 3,
                 maxLength: 200,
                 decoration: const InputDecoration(
-                  labelText: 'Rejection reason',
-                  hintText:
-                      'e.g., schedule conflict / incomplete documents / overlapping usage',
+                  labelText: "Reason",
                   border: OutlineInputBorder(),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Please enter a reason';
+                    return "Please enter a reason";
                   }
-                  if (v.trim().length < 5) {
-                    return 'Please enter at least 5 characters';
+                  if (v.trim().length < 3) {
+                    return "At least 3 characters";
                   }
                   return null;
                 },
@@ -138,7 +155,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () {
@@ -147,29 +164,28 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE74C3C),
+              backgroundColor: Color(0xFFE74C3C),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Submit Reason'),
+            child: const Text("Submit"),
           ),
         ],
       ),
     );
 
     if (ok == true) {
-      await _updateStatus("3", reason: ctl.text);
+      await _updateStatus("3", reason: ctl.text.trim());
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final it = widget.item;
-    // Image from DB: room_img stores a file name e.g., "Meeting-RoomA.jpg"
-    final imgUrl = '$kBaseUrl/assets/${it.imagePath}';
+    final imgUrl = "$kBaseUrl/assets/${it.imagePath}";
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Request Details'),
+        title: const Text("Request Details"),
         backgroundColor: QColors.primaryRed,
         foregroundColor: Colors.white,
       ),
@@ -189,12 +205,12 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
             ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /// ====== Room image at the top (from DB) ======
+              /// ==== IMAGE ====
               ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.network(
@@ -203,7 +219,7 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.grey.shade300,
                       alignment: Alignment.center,
-                      child: const Icon(
+                      child: Icon(
                         Icons.meeting_room_outlined,
                         size: 48,
                         color: QColors.primaryRed,
@@ -215,26 +231,23 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
 
               const SizedBox(height: 16),
 
-              /// ====== Request information ======
+              /// ==== DETAILS ====
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _row('Order Number', '#${it.id}'),
-                    const SizedBox(height: 8),
-                    _row('Room', it.room),
-                    const SizedBox(height: 8),
-                    _row('Time', it.time),
-                    const SizedBox(height: 8),
-                    _row('Requested by', it.userName),
+                    _row("Order Number", "#${it.id}"),
+                    _row("Room", it.room),
+                    _row("Time", it.time),
+                    _row("Requested by", it.userName),
                   ],
                 ),
               ),
 
               const Spacer(),
 
-              /// ====== Approve / Reject buttons ======
+              /// ==== BUTTONS ====
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Row(
@@ -243,24 +256,13 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                       child: ElevatedButton(
                         onPressed: _busy ? null : _confirmApprove,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2ECC71),
+                          backgroundColor: Color(0xFF2ECC71),
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: _busy
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
+                            ? circular()
                             : const Text(
-                                'Approve',
+                                "Approve",
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
@@ -270,24 +272,13 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
                       child: ElevatedButton(
                         onPressed: _busy ? null : _promptRejectReason,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE74C3C),
+                          backgroundColor: Color(0xFFE74C3C),
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: _busy
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
+                            ? circular()
                             : const Text(
-                                'Reject',
+                                "Reject",
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
@@ -302,23 +293,26 @@ class _ApproveDetailPageState extends State<ApproveDetailPage> {
     );
   }
 
+  Widget circular() => const SizedBox(
+    height: 20,
+    width: 20,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
+
   Widget _row(String k, String v) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            '$k :',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text("$k :", style: TextStyle(fontWeight: FontWeight.w700)),
           ),
-        ),
-        Expanded(
-          child: Text(
-            v,
-            style: const TextStyle(color: QColors.text),
+          Expanded(
+            child: Text(v, style: TextStyle(color: QColors.text)),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

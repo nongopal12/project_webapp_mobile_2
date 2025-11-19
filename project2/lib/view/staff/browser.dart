@@ -8,6 +8,15 @@ import 'package:project2/view/staff/edit_room.dart';
 import 'package:project2/view/staff/history_staff.dart';
 import 'package:project2/view/staff/profile_staff.dart';
 
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
+
 // -----------------------------------------------------------------
 // Data Model for Room
 // -----------------------------------------------------------------
@@ -50,7 +59,7 @@ class Room {
 // Browser Page
 // -----------------------------------------------------------------
 class Browser extends StatefulWidget {
-  final String username; // 👈 เพิ่มตัวแปรรับ username
+  final String username;
 
   const Browser({super.key, required this.username});
 
@@ -108,7 +117,7 @@ class _BrowserState extends State<Browser> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF883C31),
+              backgroundColor: SColors.primaryRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
@@ -136,7 +145,7 @@ class _BrowserState extends State<Browser> {
           context,
           MaterialPageRoute(
             builder: (context) => Dashboard(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
       case 1:
@@ -146,7 +155,7 @@ class _BrowserState extends State<Browser> {
           context,
           MaterialPageRoute(
             builder: (context) => HistoryStaff(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
       case 3:
@@ -154,7 +163,7 @@ class _BrowserState extends State<Browser> {
           context,
           MaterialPageRoute(
             builder: (context) => ProfileStaff(username: widget.username),
-          ), // 👈 ส่ง username
+          ),
         );
         break;
     }
@@ -339,23 +348,23 @@ class _BrowserState extends State<Browser> {
 
   @override
   Widget build(BuildContext context) {
-    final Color mainAppColor = Theme.of(context).primaryColor;
-    final Color accentColor = Theme.of(context).colorScheme.secondary;
-
     return Scaffold(
+      backgroundColor: SColors.bg, // 🔥 พื้นหลังสีเทาอ่อน
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
         automaticallyImplyLeading: false,
         title: RichText(
-          text: TextSpan(
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          text: const TextSpan(
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             children: [
               TextSpan(
                 text: 'Quick',
-                style: TextStyle(color: mainAppColor),
+                style: TextStyle(color: SColors.gold),
               ),
               TextSpan(
                 text: 'Room',
-                style: TextStyle(color: accentColor),
+                style: TextStyle(color: SColors.primaryRed),
               ),
             ],
           ),
@@ -363,8 +372,12 @@ class _BrowserState extends State<Browser> {
         actions: [
           IconButton(
             icon: CircleAvatar(
-              backgroundColor: Colors.transparent,
-              child: Icon(Icons.exit_to_app, color: mainAppColor, size: 24),
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(
+                Icons.exit_to_app,
+                color: SColors.primaryRed,
+                size: 24,
+              ),
             ),
             onPressed: _logout,
           ),
@@ -447,14 +460,14 @@ class _BrowserState extends State<Browser> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddRoomDialog,
-        backgroundColor: mainAppColor,
+        backgroundColor: SColors.primaryRed,
         foregroundColor: Colors.white,
         elevation: 8,
         child: const Icon(Icons.add, size: 30),
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        backgroundColor: mainAppColor,
+        backgroundColor: SColors.primaryRed,
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white70,
         items: const [
@@ -498,107 +511,143 @@ class _BrowserState extends State<Browser> {
         statusColor = Colors.grey;
     }
 
-    return Card(
-      color: const Color.fromARGB(255, 243, 240, 240),
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
+      decoration: BoxDecoration(
+        color: SColors.card, // 🔥 การ์ดสีขาว
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Image.asset(
-            imageUrl,
-            width: 120,
-            height: 110,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
-              width: 120,
-              height: 110,
-              color: Colors.grey[200],
-              child: Icon(Icons.broken_image, color: Colors.grey[400]),
+          // 🔥 รูปภาพด้านบน - ขยายเต็มความกว้าง
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Image.asset(
+              imageUrl,
+              width: double.infinity,
+              height: 160,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: double.infinity,
+                height: 160,
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.broken_image,
+                  color: Colors.grey[400],
+                  size: 50,
+                ),
+              ),
             ),
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    roomName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+
+          // 🔥 ข้อมูลห้องด้านล่าง
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  roomName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: SColors.text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      location,
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(location, style: TextStyle(color: Colors.grey[700])),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "$capacity Seats",
-                        style: TextStyle(color: Colors.grey[700]),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton(
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.people_outline,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$capacity Seats",
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // 🔥 ปุ่ม Edit / Disable / Enable
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
                         onPressed: onEdit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         child: const Text("Edit"),
                       ),
-                      if (status == "Enable")
-                        ElevatedButton(
-                          onPressed: onDisable,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text("Disable"),
-                        )
-                      else if (status == "Disable")
-                        ElevatedButton(
-                          onPressed: onEnable,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text("Enable"),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: statusColor,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: Text(status),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: status == "Enable"
+                          ? ElevatedButton(
+                              onPressed: onDisable,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text("Disable"),
+                            )
+                          : status == "Disable"
+                          ? ElevatedButton(
+                              onPressed: onEnable,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text("Enable"),
+                            )
+                          : ElevatedButton(
+                              onPressed: null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: statusColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(status),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

@@ -6,6 +6,15 @@ import 'package:project2/view/login.dart';
 import 'history_user.dart';
 import 'booking_room.dart';
 
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
+
 class CheckStatusPage extends StatefulWidget {
   const CheckStatusPage({super.key});
 
@@ -29,13 +38,17 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('uid') ?? 3;
 
-      final response = await http.get(Uri.parse('$baseUrl/api/user/status/$userId'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/user/status/$userId'),
+      );
       if (response.statusCode == 200) {
         List data = json.decode(response.body);
 
         // 🔸 Show only Pending (status = 1)
         setState(() {
-          bookingList = data.where((b) => b['status'].toString() == '1').toList();
+          bookingList = data
+              .where((b) => b['status'].toString() == '1')
+              .toList();
           _loading = false;
         });
       } else {
@@ -47,13 +60,43 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
     }
   }
 
+  Future<void> _refreshStatus() async {
+    setState(() {
+      _loading = true;
+    });
+    await _fetchStatus();
+  }
+
   void _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SColors.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -73,11 +116,11 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
   Color _statusColor(String code) {
     switch (code) {
       case '1':
-        return const Color(0xFFE6D60A);
+        return Colors.orange;
       case '2':
-        return const Color(0xFF4CAF50);
+        return Colors.green;
       case '3':
-        return const Color(0xFFF44336);
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -114,29 +157,84 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: SColors.bg, // 🔥 พื้นหลังสีเทาอ่อน
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        automaticallyImplyLeading: false,
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(
+                text: 'Quick',
+                style: TextStyle(color: SColors.gold),
+              ),
+              TextSpan(
+                text: 'Room',
+                style: TextStyle(color: SColors.primaryRed),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: CircleAvatar(
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(
+                Icons.exit_to_app,
+                color: SColors.primaryRed,
+                size: 24,
+              ),
+            ),
+            onPressed: _logout,
+          ),
+          const SizedBox(width: 10),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey[300], height: 1),
+        ),
+      ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : bookingList.isEmpty
-                ? const Center(child: Text("No pending bookings"))
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Check Pending Bookings',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        ...bookingList.map((booking) {
-                          final code = booking['status'].toString();
-                          return _buildBookingCard(booking, code);
-                        }).toList(),
-                      ],
+        child: RefreshIndicator(
+          onRefresh: _refreshStatus,
+          color: SColors.primaryRed,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : bookingList.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        "No pending bookings",
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
                     ),
-                  ),
+                  ],
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    const Text(
+                      'Check Pending Bookings',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: SColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ...bookingList.map((booking) {
+                      final code = booking['status'].toString();
+                      return _buildBookingCard(booking, code);
+                    }).toList(),
+                  ],
+                ),
+        ),
       ),
       bottomNavigationBar: _bottomNavBar(),
     );
@@ -149,37 +247,78 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAE7E6),
-        borderRadius: BorderRadius.circular(12),
+        color: SColors.card, // 🔥 การ์ดสีขาว
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _infoRow(Icons.location_on,
-              'Room: ${booking['room_number']} (Floor ${booking['room_location']})'),const SizedBox(height: 8),
-          _infoRow(Icons.calendar_today,
-              'Date: ${booking['room_date'].toString().replaceAll("T", " ").replaceAll("Z", "")}'),const SizedBox(height: 8),
-          _infoRow(Icons.access_time, 'Time: ${_timeSlot(booking['room_time'])}'),const SizedBox(height: 8),
-          _infoRow(Icons.notes, 'Reason: ${booking['reason']}'),
-          const SizedBox(height: 8),
-          Row(children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Text(text, style: const TextStyle(fontSize: 15)),
-          ]),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration:
-                  BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-              child: Text(text, style: const TextStyle(color: Colors.white)),
-            ),
+          // 🔥 Header with Status Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Room ${booking['room_number']}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: SColors.text,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+
+          _infoRow(Icons.location_on, 'Floor ${booking['room_location']}'),
+          const SizedBox(height: 6),
+          _infoRow(
+            Icons.calendar_today,
+            'Date: ${booking['room_date'].toString().split('T')[0]}',
+          ),
+          const SizedBox(height: 6),
+          _infoRow(
+            Icons.access_time,
+            'Time: ${_timeSlot(booking['room_time'])}',
+          ),
+          const SizedBox(height: 6),
+          _infoRow(Icons.notes, 'Reason: ${booking['reason']}'),
         ],
       ),
     );
@@ -188,17 +327,21 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
   Widget _infoRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, color: Colors.brown, size: 20),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
+        Icon(icon, color: SColors.primaryRed, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 15, color: SColors.text),
+          ),
+        ),
       ],
     );
   }
 
   Widget _bottomNavBar() {
-    const brown = Color(0xFF6B2E1E);
     return Container(
-      color: brown,
+      color: SColors.primaryRed, // 🔥 สีแดง
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: SafeArea(
         top: false,
@@ -216,7 +359,6 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
                 );
               },
             ),
-            // 🔄 SWAPPED position: Check Status comes before History
             _BottomNavItem(
               icon: Icons.edit_note,
               label: 'Check Status',
@@ -226,17 +368,13 @@ class _CheckStatusPageState extends State<CheckStatusPage> {
               icon: Icons.history,
               label: 'History',
               onTap: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (_) => const HistoryPage()),
                 );
               },
             ),
-            _BottomNavItem(
-              icon: Icons.logout,
-              label: 'Logout',
-              onTap: _logout,
-            ),
+            _BottomNavItem(icon: Icons.logout, label: 'Logout', onTap: _logout),
           ],
         ),
       ),
@@ -268,7 +406,10 @@ class _BottomNavItem extends StatelessWidget {
             children: [
               Icon(icon, color: Colors.white, size: 24),
               const SizedBox(height: 2),
-              Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
             ],
           ),
         ),

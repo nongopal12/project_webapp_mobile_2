@@ -6,6 +6,15 @@ import 'package:project2/view/user/booking_room2.dart';
 import 'history_user.dart';
 import 'checkstatus.dart';
 
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
+
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
 
@@ -46,24 +55,29 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-String statusText(int value) {
-  switch (value) {
-    case 1:
-      return "Available";
-    case 2:
-      return "Pending";
-    case 3:
-      return "Reserved";
-    case 4:
-      return "Disable";        
-    case 5:
-      return "Not Available";  
-    default:
-      return "Unknown";
+  Future<void> _refreshRooms() async {
+    setState(() {
+      isLoading = true;
+    });
+    await fetchRooms();
   }
-}
 
-
+  String statusText(int value) {
+    switch (value) {
+      case 1:
+        return "Available";
+      case 2:
+        return "Pending";
+      case 3:
+        return "Reserved";
+      case 4:
+        return "Disable";
+      case 5:
+        return "Not Available";
+      default:
+        return "Unknown";
+    }
+  }
 
   Color getStatusColor(String status) {
     switch (status) {
@@ -72,7 +86,7 @@ String statusText(int value) {
       case "Pending":
         return Colors.amber[700]!;
       case "Reserved":
-        return Colors.orange;
+        return Colors.red;
       case "Disable":
         return Colors.grey;
       case "Not Available":
@@ -83,21 +97,21 @@ String statusText(int value) {
   }
 
   bool isPastTime(String timeRange) {
-    final now = DateTime.now(); // ใช้เวลาปัจจุบันของเครื่อง
+    final now = DateTime.now();
     try {
-      final parts = timeRange.split('-'); // ["8.00 ", " 10.00"]
+      final parts = timeRange.split('-');
       if (parts.length != 2) return false;
 
       DateTime parsePart(String s) {
-        final t = s.trim(); // "8.00"
-        final hm = t.split('.'); // ["8","00"]
+        final t = s.trim();
+        final hm = t.split('.');
         final h = int.parse(hm[0]);
         final m = (hm.length > 1) ? int.parse(hm[1]) : 0;
         return DateTime(now.year, now.month, now.day, h, m);
       }
 
-      final end = parsePart(parts[1]); // เวลา “สิ้นสุดช่วง”
-      return now.isAfter(end); // หมดเวลาแล้วหรือยัง
+      final end = parsePart(parts[1]);
+      return now.isAfter(end);
     } catch (_) {
       return false;
     }
@@ -117,7 +131,7 @@ String statusText(int value) {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF883C31),
+              backgroundColor: SColors.primaryRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
@@ -145,20 +159,54 @@ String statusText(int value) {
         "${today.day.toString().padLeft(2, '0')} ${_monthName(today.month)} ${today.year}";
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6B2E1E),
-        title: const Text(
-          'QuickRoom',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        automaticallyImplyLeading: false,
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(
+                text: 'Quick',
+                style: TextStyle(color: SColors.gold),
+              ),
+              TextSpan(
+                text: 'Room',
+                style: TextStyle(color: SColors.primaryRed),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: CircleAvatar(
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(
+                Icons.exit_to_app,
+                color: SColors.primaryRed,
+                size: 24,
+              ),
+            ),
+            onPressed: _logout,
+          ),
+          const SizedBox(width: 10),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey[300], height: 1),
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        child: RefreshIndicator(
+          onRefresh: _refreshRooms,
+          color: SColors.primaryRed,
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     Row(
                       children: [
@@ -167,23 +215,18 @@ String statusText(int value) {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
+                            color: SColors.text,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Text(
                           formattedDate,
-                          style: const TextStyle(color: Colors.black54),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Press Available to book a room.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.black54,
-                        fontStyle: FontStyle.italic,
-                      ),
                     ),
                     const SizedBox(height: 16),
                     ...roomList.map((room) => _buildRoomCard(context, room)),
@@ -196,7 +239,6 @@ String statusText(int value) {
   }
 
   Widget _buildRoomCard(BuildContext context, dynamic room) {
-    // Build slot list with time range and DB value
     final slots = [
       {"time": "8.00 - 10.00", "db": room['room_8AM']},
       {"time": "10.00 - 12.00", "db": room['room_10AM']},
@@ -204,7 +246,6 @@ String statusText(int value) {
       {"time": "15.00 - 17.00", "db": room['room_3PM']},
     ];
 
-    // Convert DB + Time Logic
     final slotList = slots.map((slot) {
       String status = statusText(slot['db']);
       if (isPastTime(slot['time'])) {
@@ -213,86 +254,122 @@ String statusText(int value) {
       return {"time": slot['time'], "status": status};
     }).toList();
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/images/${room['room_img']}',
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+      decoration: BoxDecoration(
+        color: SColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Image.asset(
+              'assets/images/${room['room_img']}',
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
             ),
-            const SizedBox(height: 8),
-            Text(
-              "Room ${room['room_number_id']} (For ${room['room_capacity']} people)",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "Floor: ${room['room_location']}",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Column(
-              children: slotList.map<Widget>((slot) {
-                final statusColor = getStatusColor(slot['status']);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(slot['time'], style: const TextStyle(fontSize: 14)),
-                      GestureDetector(
-                        onTap: slot['status'] == "Available"
-                            ? () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => BookingRoomDetailPage(
-                                      roomName:
-                                          "Room ${room['room_number_id']} (For ${room['room_capacity']} people)",
-                                      timeSlot: slot['time'],
-                                      image:
-                                          'assets/images/${room['room_img']}',
-                                    ),
-                                  ),
-                                );
-                              }
-                            : null,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            slot['status'],
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Room ${room['room_number']} (For ${room['room_capacity']} people)",
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: SColors.text,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Floor: ${room['room_location']}",
+                      style: TextStyle(fontSize: 15, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                Column(
+                  children: slotList.map<Widget>((slot) {
+                    final statusColor = getStatusColor(slot['status']);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            slot['time'],
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                              color: SColors.text,
                             ),
                           ),
-                        ),
+
+                          /// กดจอง
+                          GestureDetector(
+                            onTap: slot['status'] == "Available"
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => BookingRoomDetailPage(
+                                          roomId: room['room_id'],
+                                          roomNumber: room['room_number'],
+                                          roomName:
+                                              "Room ${room['room_number']} (For ${room['room_capacity']} people)",
+                                          roomImage:
+                                              'assets/images/${room['room_img']}',
+                                          timeSlot: slot['time'],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                slot['status'],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -317,7 +394,7 @@ String statusText(int value) {
 
   Widget _buildBottomNavBar(BuildContext context) {
     return Container(
-      color: const Color(0xFF6B2E1E),
+      color: SColors.primaryRed,
       padding: const EdgeInsets.only(top: 6, bottom: 6),
       child: SafeArea(
         top: false,

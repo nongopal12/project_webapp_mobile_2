@@ -6,6 +6,15 @@ import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/dashboard.dart';
 import 'package:project2/view/staff/profile_staff.dart';
 
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
+
 // ---------------------------------------------------------
 // Data Model
 // ---------------------------------------------------------
@@ -85,7 +94,6 @@ class _HistoryStaffState extends State<HistoryStaff> {
     }
   }
 
-  // เพิ่มฟังก์ชัน refresh
   Future<void> _refreshHistory() async {
     setState(() {
       _historyFuture = _fetchHistory();
@@ -109,7 +117,7 @@ class _HistoryStaffState extends State<HistoryStaff> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF883C31),
+              backgroundColor: SColors.primaryRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
@@ -166,10 +174,8 @@ class _HistoryStaffState extends State<HistoryStaff> {
   // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    const Color mainColor = Color(0xFF883C31);
-    const Color accentColor = Color(0xFFD7A04E);
-
     return Scaffold(
+      backgroundColor: SColors.bg, // 🔥 พื้นหลังสีเทาอ่อน
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
@@ -180,28 +186,38 @@ class _HistoryStaffState extends State<HistoryStaff> {
             children: [
               TextSpan(
                 text: "Quick",
-                style: TextStyle(color: mainColor),
+                style: TextStyle(color: SColors.gold),
               ),
               TextSpan(
                 text: "Room",
-                style: TextStyle(color: accentColor),
+                style: TextStyle(color: SColors.primaryRed),
               ),
             ],
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.exit_to_app, color: mainColor),
+            icon: CircleAvatar(
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(
+                Icons.exit_to_app,
+                color: SColors.primaryRed,
+                size: 24,
+              ),
+            ),
             onPressed: _logout,
           ),
           const SizedBox(width: 10),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey[300], height: 1),
+        ),
       ),
 
-      // BODY - เพิ่ม RefreshIndicator
       body: RefreshIndicator(
         onRefresh: _refreshHistory,
-        color: mainColor,
+        color: SColors.primaryRed,
         child: FutureBuilder<List<HistoryItem>>(
           future: _historyFuture,
           builder: (context, snapshot) {
@@ -209,12 +225,37 @@ class _HistoryStaffState extends State<HistoryStaff> {
               return const Center(child: CircularProgressIndicator());
             }
 
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _refreshHistory,
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 200),
-                  Center(child: Text("No history available")),
+                  Center(
+                    child: Text(
+                      "No history available",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
                 ],
               );
             }
@@ -233,10 +274,10 @@ class _HistoryStaffState extends State<HistoryStaff> {
         ),
       ),
 
-      // NAV BAR - เปลี่ยนสีพื้นหลังเป็นสีขาว และไอคอนเป็นสี mainColor
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: mainColor,
+        backgroundColor: SColors.primaryRed,
         selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
         currentIndex: 2,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
@@ -254,36 +295,47 @@ class _HistoryStaffState extends State<HistoryStaff> {
   // History Card
   // ---------------------------------------------------------
   Widget _buildHistoryCard(HistoryItem item) {
-    final Color mainColor = Color(0xFF883C31);
-
     Color statusColor = item.status == "Approved"
         ? Colors.green
         : item.status == "Reject"
         ? Colors.red
         : Colors.orange;
 
-    return Card(
-      color: const Color.fromARGB(255, 243, 240, 240),
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: SColors.card, // 🔥 การ์ดสีขาว
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // HEADER + STATUS BADGE
+            // 🔥 HEADER + STATUS BADGE
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Room: ${item.room}",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    "Room: ${item.room}",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: SColors.text,
+                    ),
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 14,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
@@ -292,26 +344,85 @@ class _HistoryStaffState extends State<HistoryStaff> {
                   ),
                   child: Text(
                     item.status,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
 
             _infoRow(Icons.person, "Name: ${item.name}"),
             _infoRow(Icons.calendar_today, "Date: ${item.date}"),
             _infoRow(Icons.access_time, "Time: ${item.time}"),
-
-            // Approver
             _infoRow(Icons.verified_user, "Approver by: ${item.approverName}"),
 
-            // Reject reason (เฉพาะ Reject)
+            // 🔥 Reject reason (เฉพาะ Reject)
             if (item.status == "Reject" && item.approverComment.isNotEmpty)
-              _infoRow(Icons.comment, "Reject Reason: ${item.approverComment}"),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.comment, size: 18, color: Colors.red.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Reject Reason: ${item.approverComment}",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-            // Booking reason (แสดงทุกสถานะ)
-            _infoRow(Icons.info, "Booking Reason: ${item.reason}"),
+            // 🔥 Booking reason (แสดงทุกสถานะ)
+            if (item.reason.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Colors.grey.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Booking Reason: ${item.reason}",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -323,9 +434,14 @@ class _HistoryStaffState extends State<HistoryStaff> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Color(0xFF883C31)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
+          Icon(icon, size: 18, color: SColors.primaryRed),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 15, color: SColors.text),
+            ),
+          ),
         ],
       ),
     );

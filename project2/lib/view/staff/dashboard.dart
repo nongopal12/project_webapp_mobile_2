@@ -6,7 +6,16 @@ import 'package:project2/view/login.dart';
 import 'package:project2/view/staff/browser.dart';
 import 'package:project2/view/staff/history_staff.dart';
 import 'package:project2/view/staff/profile_staff.dart';
-import 'package:project2/view/staff/Room_browser_staff.dart'; // 👈 เพิ่ม import
+import 'package:project2/view/staff/Room_browser_staff.dart';
+
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
 
 class Dashboard extends StatefulWidget {
   final String username;
@@ -18,32 +27,28 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-  // ---------------------------------------------------------------
-  // Variables for Dashboard data
-  // ---------------------------------------------------------------
   int enableCount = 0;
   int pendingCount = 0;
   int reservedCount = 0;
   int disabledCount = 0;
   bool isLoading = true;
 
-  // ---------------------------------------------------------------
-  // Variables for Profile data
-  // ---------------------------------------------------------------
   String profileName = '';
   String profileRole = '';
-  String profileId = '';
   String profileEmail = '';
   bool isProfileLoading = true;
 
-  // ---------------------------------------------------------------
-  // Fetch Dashboard Data
-  // ---------------------------------------------------------------
-  Future<void> _fetchDashboardData() async {
-    setState(() {
-      isLoading = true;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardData();
+    _fetchProfileData();
+  }
 
+  // ================================
+  // Fetch Dashboard Data
+  // ================================
+  Future<void> _fetchDashboardData() async {
     try {
       final response = await http.get(
         Uri.parse("http://192.168.1.123:3000/api/staff/dashboard"),
@@ -58,28 +63,19 @@ class _DashboardState extends State<Dashboard> {
           disabledCount = int.tryParse(data["disabled_count"].toString()) ?? 0;
           isLoading = false;
         });
-      } else {
-        setState(() {
-          isLoading = false;
-        });
       }
     } catch (e) {
-      print("⚠️ Error fetching dashboard data: $e");
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
-  // ---------------------------------------------------------------
+  // ================================
   // Fetch Profile Data
-  // ---------------------------------------------------------------
+  // ================================
   Future<void> _fetchProfileData() async {
     try {
-      final username = widget.username;
-
       final response = await http.get(
-        Uri.parse("http://192.168.1.123:3000/api/profile/$username"),
+        Uri.parse("http://192.168.1.112:3000/api/profile/${widget.username}"),
       );
 
       if (response.statusCode == 200) {
@@ -87,64 +83,18 @@ class _DashboardState extends State<Dashboard> {
         setState(() {
           profileName = data["username"] ?? '';
           profileRole = data["role_name"] ?? '';
-          profileId = data["user_id"].toString();
           profileEmail = data["user_email"] ?? '';
           isProfileLoading = false;
         });
-      } else {
-        print(" Failed to load profile: ${response.statusCode}");
-        setState(() => isProfileLoading = false);
       }
     } catch (e) {
-      print("⚠️ Error fetching profile data: $e");
       setState(() => isProfileLoading = false);
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchDashboardData();
-    _fetchProfileData();
-  }
-
-  // ---------------------------------------------------------------
-  // Navigation
-  // ---------------------------------------------------------------
-  void _onItemTapped(int index) {
-    switch (index) {
-      case 0:
-        break;
-      case 1:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => Browser(username: widget.username),
-          ),
-        );
-        break;
-      case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HistoryStaff(username: widget.username),
-          ),
-        );
-        break;
-      case 3:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProfileStaff(username: widget.username),
-          ),
-        );
-        break;
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // Logout Confirmation
-  // ---------------------------------------------------------------
+  // ================================
+  // Logout Function
+  // ================================
   void _logout() {
     showDialog(
       context: context,
@@ -159,17 +109,14 @@ class _DashboardState extends State<Dashboard> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF883C31),
+              backgroundColor: SColors.primaryRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully.')),
-              );
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
+                MaterialPageRoute(builder: (_) => const LoginPage()),
                 (route) => false,
               );
             },
@@ -180,28 +127,28 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  // ---------------------------------------------------------------
+  // ================================
   // Build UI
-  // ---------------------------------------------------------------
+  // ================================
   @override
   Widget build(BuildContext context) {
-    final Color mainAppColor = Theme.of(context).primaryColor;
-    final Color accentColor = Theme.of(context).colorScheme.secondary;
-
     return Scaffold(
+      backgroundColor: SColors.bg,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
         automaticallyImplyLeading: false,
         title: RichText(
-          text: TextSpan(
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          text: const TextSpan(
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             children: [
               TextSpan(
-                text: 'Quick',
-                style: TextStyle(color: mainAppColor),
+                text: "Quick",
+                style: TextStyle(color: SColors.gold),
               ),
               TextSpan(
-                text: 'Room',
-                style: TextStyle(color: accentColor),
+                text: "Room",
+                style: TextStyle(color: SColors.primaryRed),
               ),
             ],
           ),
@@ -209,197 +156,131 @@ class _DashboardState extends State<Dashboard> {
         actions: [
           IconButton(
             icon: CircleAvatar(
-              backgroundColor: Colors.transparent,
-              child: Icon(Icons.exit_to_app, color: mainAppColor, size: 24),
+              backgroundColor: SColors.primaryRed.withOpacity(0.1),
+              child: const Icon(Icons.exit_to_app, color: SColors.primaryRed),
             ),
             onPressed: _logout,
           ),
           const SizedBox(width: 10),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(color: Colors.grey[300], height: 1.0),
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey[300], height: 1),
         ),
       ),
 
-      // ------------------------------------------------------------
-      // BODY
-      // ------------------------------------------------------------
       body: RefreshIndicator(
         onRefresh: () async {
           await _fetchDashboardData();
           await _fetchProfileData();
         },
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Dashboard',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              _buildProfileCard(context),
+              _buildProfileCard(),
               const SizedBox(height: 20),
-
-              // 👇 ปุ่ม Show Room (ใหม่)
-              _buildShowRoomButton(context),
-              const SizedBox(height: 16),
-
-              if (isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else
-                GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildDashboardCard(
-                      context,
-                      Icons.check,
-                      'Enable',
-                      enableCount,
-                      [Colors.green.shade50, Colors.green.shade300],
-                      Colors.green.shade800,
-                    ),
-                    _buildDashboardCard(
-                      context,
-                      Icons.hourglass_empty,
-                      'Pending',
-                      pendingCount,
-                      [Colors.yellow.shade50, Colors.yellow.shade400],
-                      Colors.yellow.shade800,
-                    ),
-                    _buildDashboardCard(
-                      context,
-                      Icons.lock_outline,
-                      'Reserved',
-                      reservedCount,
-                      [Colors.red.shade50, Colors.red.shade300],
-                      Colors.red.shade800,
-                    ),
-                    _buildDashboardCard(
-                      context,
-                      Icons.do_not_disturb_on_outlined,
-                      'Disabled',
-                      disabledCount,
-                      [Colors.blueGrey.shade50, Colors.blueGrey.shade300],
-                      Colors.blueGrey.shade800,
-                    ),
-                  ],
-                ),
+              _buildBrowseRoomsButton(),
+              const SizedBox(height: 20),
+              isLoading
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  : _buildDashboardGrid(),
             ],
           ),
         ),
       ),
 
-      // ------------------------------------------------------------
-      // BOTTOM NAVIGATION
-      // ------------------------------------------------------------
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        backgroundColor: mainAppColor,
+        backgroundColor: SColors.primaryRed,
         selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white.withOpacity(0.6),
-        selectedFontSize: 14,
-        unselectedFontSize: 12,
+        unselectedItemColor: Colors.white70,
         currentIndex: 0,
-        onTap: _onItemTapped,
+        onTap: (i) {
+          switch (i) {
+            case 0:
+              break;
+            case 1:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Browser(username: widget.username),
+                ),
+              );
+              break;
+            case 2:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HistoryStaff(username: widget.username),
+                ),
+              );
+              break;
+            case 3:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProfileStaff(username: widget.username),
+                ),
+              );
+              break;
+          }
+        },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Main'),
-          BottomNavigationBarItem(icon: Icon(Icons.edit), label: 'Edit'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Main"),
+          BottomNavigationBarItem(icon: Icon(Icons.edit), label: "Edit"),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------
-  // Show Room Button
-  // ---------------------------------------------------------------
-  Widget _buildShowRoomButton(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const RoomBrowserPage()),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF883C31), Color(0xFFA84B3E)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF883C31).withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.meeting_room_rounded, color: Colors.white, size: 24),
-            SizedBox(width: 10),
-            Text(
-              'Show Room',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------
-  // Profile Card
-  // ---------------------------------------------------------------
-  Widget _buildProfileCard(BuildContext context) {
+  // ================================
+  // Profile Card (Same as Approver Style)
+  // ================================
+  Widget _buildProfileCard() {
     if (isProfileLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 245, 243, 243),
-        borderRadius: BorderRadius.circular(12),
+        color: SColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 55,
+            height: 55,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(8),
+              shape: BoxShape.circle,
+              color: SColors.primaryRed.withOpacity(0.12),
             ),
-            child: const Icon(Icons.person, size: 32, color: Colors.grey),
+            child: const Icon(
+              Icons.person,
+              size: 32,
+              color: SColors.primaryRed,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,29 +288,21 @@ class _DashboardState extends State<Dashboard> {
                 Text(
                   profileName,
                   style: const TextStyle(
-                    fontSize: 13,
+                    color: SColors.primaryRed,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF883C31),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'ID: ${profileId.padLeft(5, '0')}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  "Email: $profileEmail",
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Position: $profileRole',
-                  style: const TextStyle(fontSize: 11),
+                  "Role: $profileRole",
+                  style: const TextStyle(fontSize: 13),
                 ),
-                if (profileEmail.isNotEmpty)
-                  Text(
-                    'Email: $profileEmail',
-                    style: const TextStyle(fontSize: 10, color: Colors.black87),
-                    overflow: TextOverflow.ellipsis,
-                  ),
               ],
             ),
           ),
@@ -438,54 +311,123 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  // ---------------------------------------------------------------
-  // Dashboard Cards
-  // ---------------------------------------------------------------
-  Widget _buildDashboardCard(
-    BuildContext context,
-    IconData icon,
-    String title,
-    int count,
-    List<Color> gradientColors,
-    Color color,
-  ) {
-    return Card(
-      elevation: 1,
-      color: const Color.fromARGB(255, 243, 240, 240),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
+  // ================================
+  // Browse Rooms Button (ตามรูป)
+  // ================================
+  Widget _buildBrowseRoomsButton() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RoomBrowserPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black, width: 1),
+        ),
         child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.bottomLeft,
-                  end: Alignment.topRight,
-                ),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 12),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.meeting_room_outlined, color: Colors.black, size: 20),
+            SizedBox(width: 8),
             Text(
-              title,
+              "Browse Rooms",
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
               ),
-            ),
-            const Spacer(),
-            Text(
-              count.toString(),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ================================
+  // Dashboard Grid
+  // ================================
+  Widget _buildDashboardGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _buildDashboardCard(
+          Icons.check_circle,
+          "Enable",
+          enableCount,
+          Colors.green,
+        ),
+        _buildDashboardCard(
+          Icons.hourglass_bottom,
+          "Pending",
+          pendingCount,
+          Colors.orange,
+        ),
+        _buildDashboardCard(Icons.lock, "Reserved", reservedCount, Colors.red),
+        _buildDashboardCard(
+          Icons.block,
+          "Disabled",
+          disabledCount,
+          Colors.grey,
+        ),
+      ],
+    );
+  }
+
+  // ================================
+  // Dashboard Card (Icon inline with text)
+  // ================================
+  Widget _buildDashboardCard(
+    IconData icon,
+    String title,
+    int count,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: SColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // icon + title อยู่บรรทัดเดียว
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "$count",
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }

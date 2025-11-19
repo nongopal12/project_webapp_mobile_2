@@ -1,21 +1,35 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:project2/view/login.dart';
-import 'package:project2/view/user/booking_room.dart';
 import 'history_user.dart';
 import 'checkstatus.dart';
 
+/// ===== QuickRoom Theme =====
+class SColors {
+  static const Color bg = Color(0xFFF7F7F9);
+  static const Color primaryRed = Color.fromARGB(255, 136, 60, 48);
+  static const Color gold = Color(0xFFCC9A2B);
+  static const Color card = Colors.white;
+  static const Color text = Color(0xFF2E2E2E);
+}
+
 class BookingRoomDetailPage extends StatefulWidget {
+  final int roomId; // ใช้ในการ book
+  final int roomNumber; // สำหรับแสดงผล
   final String roomName;
+  final String roomImage;
   final String timeSlot;
-  final String image;
 
   const BookingRoomDetailPage({
     super.key,
+    required this.roomId,
+    required this.roomNumber,
     required this.roomName,
+    required this.roomImage,
     required this.timeSlot,
-    required this.image,
   });
 
   @override
@@ -25,17 +39,28 @@ class BookingRoomDetailPage extends StatefulWidget {
 class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
   String? selectedReason;
   final TextEditingController otherReasonController = TextEditingController();
-  final int userId = 3; // Temporary user ID for now
+
+  int? userId;
 
   @override
   void initState() {
     super.initState();
+    loadUserId();
+
     otherReasonController.addListener(() {
       setState(() {});
     });
   }
 
-  // Convert readable time slot string to numeric slot for DB
+  Future<void> loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getInt('uid');
+    });
+
+    print("🔥 Loaded userId = $userId");
+  }
+
   int mapTimeSlotToNumber(String timeSlot) {
     if (timeSlot.contains("8.00")) return 1;
     if (timeSlot.contains("10.00")) return 2;
@@ -45,6 +70,13 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
   }
 
   Future<void> _bookRoom() async {
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User ID error, please login again.")),
+      );
+      return;
+    }
+
     String reasonText = selectedReason == "Other"
         ? otherReasonController.text.trim()
         : selectedReason ?? "";
@@ -62,7 +94,7 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'user_id': userId,
-          'room_id': _extractRoomNumber(widget.roomName),
+          'room_id': widget.roomId, // ส่ง room_id ตรง!!! ไม่ผิดแน่นอน
           'time_slot': mapTimeSlotToNumber(widget.timeSlot),
           'reason': reasonText,
         }),
@@ -76,7 +108,6 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
           ),
         );
 
-        // Redirect to CheckStatus page
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const CheckStatusPage()),
@@ -87,54 +118,10 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
-  }
-
-  int _extractRoomNumber(String roomName) {
-    final regex = RegExp(r'Room\s(\d+)');
-    final match = regex.firstMatch(roomName);
-    if (match != null) {
-      return int.tryParse(match.group(1) ?? '0') ?? 0;
-    }
-    return 0;
-  }
-
-  void _logout() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF883C31),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully.')),
-              );
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-              );
-            },
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showConfirmDialog(BuildContext context) {
@@ -150,22 +137,13 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
           content: Text(
             "Are you sure you want to book ${widget.roomName} for ${widget.timeSlot}?\n\nReason: $reasonText",
           ),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           actions: [
             TextButton(
-              child: const Text(
-                "Cancel",
-                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
-              ),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
               onPressed: () => Navigator.pop(context),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               onPressed: () {
                 Navigator.pop(context);
                 _bookRoom();
@@ -181,6 +159,37 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
     );
   }
 
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SColors.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     otherReasonController.dispose();
@@ -192,200 +201,234 @@ class _BookingRoomDetailPageState extends State<BookingRoomDetailPage> {
     final bool isOtherSelected = selectedReason == "Other";
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6B2E1E),
+        backgroundColor: Colors.white,
         title: const Text(
-          "Booking Room",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          "QuickRoom",
+          style: TextStyle(
+            color: SColors.primaryRed,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.exit_to_app, color: SColors.primaryRed),
+            onPressed: _logout,
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Card(
-            color: const Color(0xFFF5F5F5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
+      body: userId == null
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
               padding: const EdgeInsets.all(16.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "${widget.roomName} (${widget.timeSlot})",
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(widget.image,
-                          height: 150, fit: BoxFit.cover),
-                    ),
-                    const SizedBox(height: 16),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Booking Reason:",
-                        style: TextStyle(fontSize: 14),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: SColors.card,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x22000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 10),
-                      ),
-                      value: selectedReason,
-                      items: const [
-                        DropdownMenuItem(
-                            value: "Study", child: Text("Study")),
-                        DropdownMenuItem(
-                            value: "Group Meeting",
-                            child: Text("Group Meeting")),
-                        DropdownMenuItem(
-                            value: "Project Work", child: Text("Project Work")),
-                        DropdownMenuItem(value: "Other", child: Text("Other")),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          selectedReason = value;
-                          if (value != "Other") {
-                            otherReasonController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (isOtherSelected)
-                      TextField(
-                        controller: otherReasonController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: "Please specify your reason",
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.roomName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: SColors.text,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 10),
 
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 30, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: selectedReason == null ||
-                              (isOtherSelected &&
-                                  otherReasonController.text.trim().isEmpty)
-                          ? null
-                          : () {
-                              _showConfirmDialog(context);
-                            },
-                      child: const Text("Confirm Booking",
-                          style: TextStyle(color: Colors.white)),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: SColors.primaryRed.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            widget.timeSlot,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: SColors.primaryRed,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            widget.roomImage,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Booking Reason:",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: SColors.text,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          value: selectedReason,
+                          items: const [
+                            DropdownMenuItem(
+                              value: "Study",
+                              child: Text("Study"),
+                            ),
+                            DropdownMenuItem(
+                              value: "Group Meeting",
+                              child: Text("Group Meeting"),
+                            ),
+                            DropdownMenuItem(
+                              value: "Project Work",
+                              child: Text("Project Work"),
+                            ),
+                            DropdownMenuItem(
+                              value: "Other",
+                              child: Text("Other"),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              selectedReason = value;
+                              if (value != "Other") {
+                                otherReasonController.clear();
+                              }
+                            });
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        if (isOtherSelected)
+                          TextField(
+                            controller: otherReasonController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              labelText: "Please specify your reason",
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 25),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 20,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed:
+                                selectedReason == null ||
+                                    (isOtherSelected &&
+                                        otherReasonController.text
+                                            .trim()
+                                            .isEmpty)
+                                ? null
+                                : () {
+                                    _showConfirmDialog(context);
+                                  },
+                            child: const Text(
+                              "Confirm Booking",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavBar(context),
+
+      // BOTTOM NAV
+      bottomNavigationBar: bottomNavBar(context),
     );
   }
 
-  Widget _buildBottomNavBar(BuildContext context) {
+  Widget bottomNavBar(BuildContext context) {
     return Container(
-      color: const Color(0xFF6B2E1E),
-      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      color: SColors.primaryRed,
       child: SafeArea(
-        top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _BottomNavItem(
-              icon: Icons.home,
-              label: 'HOME',
-              onTap: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const UserHomePage()),
-                  (route) => false,
-                );
-              },
-            ),
-            _BottomNavItem(
-              icon: Icons.edit_note,
-              label: 'Check Status',
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CheckStatusPage()),
-                );
-              },
-            ),
-            _BottomNavItem(
-              icon: Icons.history,
-              label: 'History',
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HistoryPage()),
-                );
-              },
-            ),
-            _BottomNavItem(
-              icon: Icons.logout,
-              label: 'Logout',
-              onTap: _logout,
-            ),
+            navItem(Icons.home, "Home", () {
+              Navigator.pop(context);
+            }),
+            navItem(Icons.edit_note, "Status", () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const CheckStatusPage()),
+              );
+            }),
+            navItem(Icons.history, "History", () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const HistoryPage()),
+              );
+            }),
           ],
         ),
       ),
     );
   }
-}
 
-class _BottomNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Flexible(
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Colors.white24,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 24),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white, fontSize: 11),
-              ),
-            ],
-          ),
+  Widget navItem(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
         ),
       ),
     );
