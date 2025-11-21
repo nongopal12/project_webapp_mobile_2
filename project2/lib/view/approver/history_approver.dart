@@ -32,7 +32,7 @@ class _HistoryPageState extends State<HistoryPage> {
   List<dynamic> historyList = [];
   bool isLoading = true;
 
-  final String baseUrl = "http://192.168.1.123:3000";
+  final String baseUrl = "http://172.27.13.156:3000";
 
   int _toIntStatus(dynamic v) =>
       (v is int) ? v : (int.tryParse(v?.toString() ?? '') ?? 0);
@@ -439,7 +439,7 @@ class HistoryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text("Room : ${item['room'] ?? '-'}"),
+                Text("Room : ${item['room_number'] ?? '-'}"),
                 Text("Time : ${item['time'] ?? '-'}"),
                 Text("Date : ${item['room_date'] ?? '-'}"),
                 const SizedBox(height: 4),

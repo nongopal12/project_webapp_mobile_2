@@ -39,7 +39,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _loading = true);
 
     try {
-      final url = Uri.parse("http://192.168.1.123:3000/api/register");
+      final url = Uri.parse("http://172.27.13.156:3000/api/register");
 
       final res = await http.post(
         url,

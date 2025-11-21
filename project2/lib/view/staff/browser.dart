@@ -68,7 +68,7 @@ class Browser extends StatefulWidget {
 }
 
 class _BrowserState extends State<Browser> {
-  final String _baseUrl = 'http://192.168.1.123:3000/api/staff/rooms';
+  final String _baseUrl = 'http://172.27.13.156:3000/api/staff/rooms';
   late Future<List<Room>> _roomsFuture;
 
   @override

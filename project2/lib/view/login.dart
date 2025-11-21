@@ -384,7 +384,7 @@ class AppColors {
 // ====== API เชื่อมกับ Node.js + เก็บ session ======
 class AuthApi {
   // ✅ ให้ใช้ IP เดียวกับ HistoryPage
-  final String baseUrl = "http://192.168.1.123:3000";
+  final String baseUrl = "http://172.27.13.156:3000";
 
   // ✅ ตัวแปร static ให้หน้าอื่นอ้างอิงได้
   static int? userId;

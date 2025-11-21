@@ -51,7 +51,7 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _fetchDashboardData() async {
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.1.123:3000/api/staff/dashboard"),
+        Uri.parse("http://172.27.13.156:3000/api/staff/dashboard"),
       );
 
       if (response.statusCode == 200) {
@@ -75,7 +75,7 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _fetchProfileData() async {
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.1.112:3000/api/profile/${widget.username}"),
+        Uri.parse("http://172.27.13.156:3000/api/profile/${widget.username}"),
       );
 
       if (response.statusCode == 200) {

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 /// ===== Backend base URL =====
-const String kBaseUrl = "http://192.168.1.123:3000";
+const String kBaseUrl = "http://172.27.13.156:3000";
 
 /// ===== THEME (โทนสี QuickRoom) =====
 class QColors {

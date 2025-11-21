@@ -35,7 +35,7 @@ class _UserHomePageState extends State<UserHomePage> {
   Future<void> fetchRooms() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.112:3000/api/rooms'),
+        Uri.parse('http://172.27.13.156:3000/api/rooms'),
       );
       if (response.statusCode == 200) {
         setState(() {

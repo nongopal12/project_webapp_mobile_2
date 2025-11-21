@@ -743,19 +743,14 @@ app.get("/api/staff/history", (req, res) => {
         WHEN '3' THEN 'Reject'
         ELSE 'Unknown'
       END AS status,
-
-      b.room_img AS image,
-
-      -- 👇 เพิ่มชื่อ Approver 
-      a.username AS approver_name,
-
-      -- 👇 เพิ่ม Comment ของ Approver
+      b.room_img AS image,     
+      a.username AS approver_name,     
       h.approver_comment
 
     FROM booking_history AS h
     JOIN user AS u ON h.user_id = u.id
     JOIN booking AS b ON h.room_number = b.room_id
-    LEFT JOIN user AS a ON h.approver_by = a.id   -- 👈 เพิ่ม join นี้
+    LEFT JOIN user AS a ON h.approver_by = a.id  
     ORDER BY h.room_date DESC, h.room_time DESC;
   `;
 
@@ -771,7 +766,7 @@ app.get("/api/staff/history", (req, res) => {
 // ====================  UPDATE STATUS Dashboard page (Can be use all role) ==================== //
 app.put("/api/approver/booking/:id", (req, res) => {
   const { id } = req.params;
-  const { status, approver_id, reject_reason } = req.body; 
+  const { status, approver_id, reject_reason } = req.body;
   // status: "2" = approve, "3" = reject
 
   if (!["2", "3"].includes(status)) {
@@ -936,7 +931,7 @@ app.get("/api/history", (req, res) => {
       id: row.id,
       name: row.booking_name,
       user_email: row.user_email,
-      room_number: `Room ${row.room_number}`,
+      room_number: `Room ${row.room_number}`, 
       room_date: row.room_date,
       time: row.room_time,
       reason: row.reason,
