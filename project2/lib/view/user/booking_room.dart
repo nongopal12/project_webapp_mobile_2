@@ -35,7 +35,7 @@ class _UserHomePageState extends State<UserHomePage> {
   Future<void> fetchRooms() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.123:3000/api/rooms'),
+        Uri.parse('http://192.168.1.112:3000/api/rooms'),
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -248,9 +248,6 @@ class _UserHomePageState extends State<UserHomePage> {
 
     final slotList = slots.map((slot) {
       String status = statusText(slot['db']);
-      if (isPastTime(slot['time'])) {
-        status = "Not Available";
-      }
       return {"time": slot['time'], "status": status};
     }).toList();
 

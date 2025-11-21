@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:project2/view/approver/history_approver.dart';
 import 'package:project2/view/approver/home.dart';
 import 'package:project2/view/approver/proflie.dart';
 import 'package:project2/view/login.dart';
 
-const String kBaseUrl = "http://192.168.1.123:3000";
+const String kBaseUrl = "http://192.168.1.112:3000";
 
 class AColors {
   static const bg = Color(0xFFF7F7F9);
@@ -94,6 +95,9 @@ class _ApprovePageState extends State<ApprovePage> {
     }
   }
 
+  // ==========================================================
+  // 🔥 ฟังก์ชันใหม่: ส่ง approver_id + reason เหมือน ApproveDetailPage
+  // ==========================================================
   Future<void> _submitDecision(
     ApproveItem it,
     String status, {
@@ -113,11 +117,23 @@ class _ApprovePageState extends State<ApprovePage> {
     final String statusCode = status == 'approved' ? '2' : '3';
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final approverId = prefs.getInt("uid");
+
+      if (approverId == null) {
+        throw Exception("Approver ID missing.");
+      }
+
       final uri = Uri.parse('$kBaseUrl/api/approver/booking/${it.id}');
+
       final res = await http.put(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'status': statusCode}),
+        body: jsonEncode({
+          'status': statusCode,
+          'approver_id': approverId,
+          'reject_reason': reason ?? "",
+        }),
       );
 
       if (res.statusCode != 200) {
@@ -128,7 +144,7 @@ class _ApprovePageState extends State<ApprovePage> {
       final msg = status == 'approved'
           ? 'Request #${it.id} has been approved.'
           : 'Request #${it.id} has been rejected'
-              '${(reason != null && reason.trim().isNotEmpty) ? ' (Reason: ${reason.trim()})' : ''}';
+                '${(reason != null && reason.trim().isNotEmpty) ? ' (Reason: ${reason.trim()})' : ''}';
 
       _showSnack(msg);
     } catch (e) {
@@ -139,43 +155,14 @@ class _ApprovePageState extends State<ApprovePage> {
     }
   }
 
-  Future<void> _confirmLogout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AColors.primaryRed,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
-
   Future<void> _confirmApprove(ApproveItem it) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Approval'),
         content: Text(
-            'Do you want to approve request #${it.id}?\nRoom: ${it.room}\nTime: ${it.time}\nRequested by: ${it.userName}'),
+          'Do you want to approve request #${it.id}?\nRoom: ${it.room}\nTime: ${it.time}\nRequested by: ${it.userName}',
+        ),
         actions: [
           TextButton(
             child: const Text('Cancel'),
@@ -214,16 +201,11 @@ class _ApprovePageState extends State<ApprovePage> {
             maxLength: 200,
             decoration: const InputDecoration(
               labelText: 'Rejection Reason',
-              hintText: 'e.g., Schedule conflict / Missing document / Time overlap',
               border: OutlineInputBorder(),
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) {
-                return 'Please enter a reason';
-              }
-              if (v.trim().length < 5) {
-                return 'Please enter at least 5 characters';
-              }
+              if (v == null || v.trim().isEmpty) return 'Please enter a reason';
+              if (v.trim().length < 3) return 'At least 3 characters';
               return null;
             },
           ),
@@ -235,7 +217,9 @@ class _ApprovePageState extends State<ApprovePage> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, true);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE74C3C),
@@ -247,7 +231,9 @@ class _ApprovePageState extends State<ApprovePage> {
       ),
     );
 
-    if (ok == true) await _submitDecision(it, 'rejected', reason: ctl.text);
+    if (ok == true) {
+      await _submitDecision(it, 'rejected', reason: ctl.text.trim());
+    }
   }
 
   void _showSnack(String msg) {
@@ -268,6 +254,7 @@ class _ApprovePageState extends State<ApprovePage> {
             slivers: [
               SliverToBoxAdapter(child: SizedBox(height: top * 0.1)),
               SliverToBoxAdapter(child: _buildHeader()),
+
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
@@ -283,6 +270,7 @@ class _ApprovePageState extends State<ApprovePage> {
                   ),
                 ),
               ),
+
               if (_loading)
                 const SliverToBoxAdapter(
                   child: Padding(
@@ -379,7 +367,12 @@ class _ApprovePageState extends State<ApprovePage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.logout_rounded, color: AColors.primaryRed),
-              onPressed: _confirmLogout,
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                );
+              },
               tooltip: 'Logout',
             ),
           ),
@@ -430,7 +423,8 @@ class _ApprovePageState extends State<ApprovePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const ProfileApproverPage()),
+                          builder: (_) => const ProfileApproverPage(),
+                        ),
                       );
                       break;
                   }
@@ -492,8 +486,10 @@ class _ApproveCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Order Number: #${item.id}",
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              "Order Number: #${item.id}",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
 
             const SizedBox(height: 6),
             Text("Requested by: ${item.userName}"),
